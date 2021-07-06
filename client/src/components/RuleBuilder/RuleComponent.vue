@@ -10,7 +10,6 @@
 
 <script>
 import _l from "utils/localization";
-import Vue from "vue";
 
 export default {
     data: function () {
