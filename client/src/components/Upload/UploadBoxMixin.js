@@ -48,6 +48,10 @@ export default {
         },
         remoteFiles() {
             // this needs to be true for the tests to pass
+            console.log("Evaluating remoteFiles");
+            console.log(`this.fileSourcesConfigured: ${this.fileSourcesConfigured}`);
+            console.log(`this.ftpUploadSite: ${this.ftpUploadSite}`);
+            console.log(`Returning ${!!this.fileSourcesConfigured || !!this.ftpUploadSite}`);
             return !!this.fileSourcesConfigured || !!this.ftpUploadSite;
         },
         btnCloseTitle() {
