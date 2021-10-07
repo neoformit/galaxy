@@ -31,7 +31,7 @@
                                         <b-form-input name="password" type="password" v-model="password" />
                                         <b-form-text>
                                             <a @click="reset" href="javascript:void(0)" role="button"
-                                                >Forgotten password?</a
+                                                >Forgot password?</a
                                             >
                                         </b-form-text>
                                     </b-form-group>
