@@ -114,7 +114,7 @@
                     </a>
 
                     <a href="https://rcc.uq.edu.au/" target="_blank">
-                        <img src="/static/images/logos/uq.png" />
+                        <img src="/static/images/logos/uq-2.png" />
                     </a>
                 </div>
             </div>
