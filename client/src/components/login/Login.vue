@@ -1,12 +1,27 @@
 <template>
     <div class="container">
-        <div class="row justify-content-md-center">
+        <div class="row login">
             <template v-if="!confirmURL">
                 <div class="col col-lg-6">
                     <b-alert :show="messageShow" :variant="messageVariant" v-html="messageText" />
                     <b-form id="login" @submit.prevent="submitGalaxyLogin()">
-                        <b-card no-body header="Welcome to Galaxy, please log in">
+                        <b-card no-body header="Welcome to Galaxy Australia, please log in">
                             <b-card-body>
+                                <div class="aaf-login">
+                                    <!-- AAF login -->
+                                    <b-form-group>
+                                        <b-button name="aaf-login">
+                                            <img
+                                                src="https://swift.rc.nectar.org.au/v1/AUTH_377/public/Galaxy/AAF_BTN_Sign_in_med_gradient_orange_FIN2020.png"
+                                            />
+                                        </b-button>
+                                        <b-form-text>
+                                            Australian Access Federation login gives you access to additional storage
+                                            and compute resources.
+                                        </b-form-text>
+                                    </b-form-group>
+                                </div>
+
                                 <div>
                                     <!-- standard internal galaxy login -->
                                     <b-form-group label="Public Name or Email Address">
@@ -15,9 +30,8 @@
                                     <b-form-group label="Password">
                                         <b-form-input name="password" type="password" v-model="password" />
                                         <b-form-text>
-                                            Forgot password?
                                             <a @click="reset" href="javascript:void(0)" role="button"
-                                                >Click here to reset your password.</a
+                                                >Forgot password?</a
                                             >
                                         </b-form-text>
                                     </b-form-group>
@@ -70,6 +84,46 @@
             <div v-if="show_welcome_with_login" class="col">
                 <b-embed type="iframe" :src="welcome_url" aspect="1by1" />
             </div>
+        </div>
+
+        <div class="footer">
+            <div class="row">
+                <div class="row logo">
+                    <a href="https://www.melbournebioinformatics.org.au/" target="_blank">
+                        <img src="/static/images/logos/melbourne-bioinformatics.png" />
+                    </a>
+
+                    <a href="https://ardc.edu.au/" target="_blank">
+                        <img src="/static/images/logos/ardc.png" />
+                    </a>
+
+                    <a href="https://bioplatforms.com/" target="_blank">
+                        <img src="/static/images/logos/bpa.png" />
+                    </a>
+
+                    <a href="https://www.biocommons.org.au/" target="_blank">
+                        <img src="/static/images/logos/australian-biocommons.png" />
+                    </a>
+
+                    <a href="https://www.qcif.edu.au/" target="_blank">
+                        <img src="/static/images/logos/qcif.jpg" />
+                    </a>
+
+                    <a href="https://www.dese.gov.au/ncris" target="_blank">
+                        <img src="/static/images/logos/ncris.svg" />
+                    </a>
+
+                    <a href="https://rcc.uq.edu.au/" target="_blank">
+                        <img src="/static/images/logos/uq-2.png" />
+                    </a>
+                </div>
+            </div>
+
+            <p class="text-center">
+                The content of this website is licensed under a Creative Commmons Attribute 3.0 Australian License.
+                Please review the Galaxy Australia
+                <a href="">Terms of Use and Policies.</a>
+            </p>
         </div>
     </div>
 </template>
@@ -176,7 +230,69 @@ export default {
 };
 </script>
 <style scoped>
+.login {
+    transform: translate(-50%, -50%);
+    position: absolute;
+    top: 40%;
+    left: 50%;
+    width: 100%;
+    max-width: 1200px;
+    justify-content: center;
+}
 .card-body {
     overflow: visible;
+}
+.aaf-login {
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 2rem;
+}
+.aaf-login button {
+    padding: 1rem;
+    background: transparent;
+    border-color: transparent;
+    border-radius: 0.25rem;
+    transition-duration: 0.25s;
+}
+.aaf-login button:hover {
+    background-color: #c8cfd6;
+}
+.aaf-login img {
+    width: auto;
+    height: 45px;
+}
+.footer {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+}
+.footer .row {
+    justify-content: center;
+}
+.footer .logo {
+    border-bottom: 1px solid #ddd;
+}
+.footer .logo img {
+    margin: 1rem;
+    height: 50px;
+    width: auto;
+}
+@media only screen and (max-width: 1400px) {
+    .footer .logo img {
+        height: 40px;
+    }
+}
+@media only screen and (max-width: 1200px) {
+    .footer .logo img {
+        height: 30px;
+    }
+}
+@media only screen and (max-width: 1000px) {
+    .footer .logo img {
+        height: 60px;
+    }
 }
 </style>
