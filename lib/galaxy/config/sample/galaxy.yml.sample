@@ -1,21 +1,21 @@
 # Galaxy is configured by default to be usable in a single-user development
 # environment.  To tune the application for a multi-user production
 # environment, see the documentation at:
-# 
+#
 #  https://docs.galaxyproject.org/en/master/admin/production.html
-# 
+#
 # Throughout this sample configuration file, except where stated otherwise,
 # uncommented values override the default if left unset, whereas commented
 # values are set to the default value.  Relative paths are relative to the root
 # Galaxy directory.
-# 
+#
 # Examples of many of these options are explained in more detail in the Galaxy
 # Community Hub.
-# 
+#
 #   https://galaxyproject.org/admin/config
-# 
+#
 # Config hackers are encouraged to check there before asking for help.
-# 
+#
 uwsgi:
 
   # The address and port on which to listen.  By default, only listen to
@@ -1578,7 +1578,7 @@ galaxy:
 
   # Show the site's welcome page (see welcome_url) alongside the login
   # page (even if require_login is true).
-  #show_welcome_with_login: false
+  show_welcome_with_login: true
 
   # Allow unregistered users to create new accounts (otherwise, they
   # will have to be created by an admin).
@@ -1744,17 +1744,17 @@ galaxy:
   #history_local_serial_workflow_scheduling: false
 
   # Enables and disables OpenID Connect (OIDC) support.
-  #enable_oidc: false
+  enable_oidc: true
 
   # Sets the path to OIDC configuration file.
   # The value of this option will be resolved with respect to
   # <config_dir>.
-  #oidc_config_file: oidc_config.xml
+  oidc_config_file: oidc_config.xml
 
   # Sets the path to OIDC backends configuration file.
   # The value of this option will be resolved with respect to
   # <config_dir>.
-  #oidc_backends_config_file: oidc_backends_config.xml
+  oidc_backends_config_file: oidc_backends_config.xml
 
   # XML config file that allows the use of different authentication
   # providers (e.g. LDAP) instead or in addition to local authentication
@@ -2282,4 +2282,3 @@ galaxy:
   # The value of this option will be resolved with respect to
   # <config_dir>.
   #tool_destinations_config_file: tool_destinations.yml
-

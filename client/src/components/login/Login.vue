@@ -7,19 +7,26 @@
                     <b-form id="login" @submit.prevent="submitGalaxyLogin()">
                         <b-card no-body header="Welcome to Galaxy Australia, please log in">
                             <b-card-body>
-                                <div class="aaf-login">
-                                    <!-- AAF login -->
-                                    <b-form-group>
-                                        <b-button name="aaf-login">
-                                            <img
-                                                src="https://swift.rc.nectar.org.au/v1/AUTH_377/public/Galaxy/AAF_BTN_Sign_in_med_gradient_orange_FIN2020.png"
-                                            />
-                                        </b-button>
-                                        <b-form-text>
-                                            Australian Access Federation login gives you access to additional storage
-                                            and compute resources.
-                                        </b-form-text>
-                                    </b-form-group>
+                                <div v-if="enable_oidc">
+                                    <!-- Templated OIDC login -->
+                                    <!-- <external-login :login_page="true" /> -->
+
+                                    <!-- Custom OIDC login -->
+                                    <div v-for="(idp_info, idp) in filtered_oidc_idps" :key="idp" class="m-1">
+                                        <span v-if="idp_info['icon']">
+                                            <b-button variant="link" class="d-block mb-3" @click="submitOIDCLogin(idp)">
+                                                <img :src="idp_info['icon']" height="45" :alt="idp" />
+                                            </b-button>
+                                        </span>
+
+                                        <span v-else>
+                                            <b-button class="d-block mb-3" @click="submitOIDCLogin(idp)">
+                                                <i :class="oidc_idps[idp]" />
+                                                Sign in with
+                                                {{ idp.charAt(0).toUpperCase() + idp.slice(1) }}
+                                            </b-button>
+                                        </span>
+                                    </div>
                                 </div>
 
                                 <div>
@@ -36,10 +43,6 @@
                                         </b-form-text>
                                     </b-form-group>
                                     <b-button name="login" type="submit">Login</b-button>
-                                </div>
-                                <div v-if="enable_oidc">
-                                    <!-- OIDC login-->
-                                    <external-login :login_page="true" />
                                 </div>
                             </b-card-body>
                             <b-card-footer>
@@ -176,6 +179,12 @@ export default {
             var urlParams = new URLSearchParams(window.location.search);
             return urlParams.has("confirm") && urlParams.get("confirm") == "true";
         },
+        filtered_oidc_idps() {
+            const filtered = Object.assign({}, this.oidc_idps);
+            delete filtered.custos;
+            delete filtered.cilogon;
+            return filtered;
+        },
     },
     methods: {
         toggleLogin() {
@@ -200,6 +209,21 @@ export default {
                         window.location = encodeURI(response.data.redirect);
                     } else {
                         window.location = `${rootUrl}`;
+                    }
+                })
+                .catch((error) => {
+                    this.messageVariant = "danger";
+                    const message = error.response.data && error.response.data.err_msg;
+                    this.messageText = message || "Login failed for an unknown reason.";
+                });
+        },
+        submitOIDCLogin(idp) {
+            const rootUrl = getAppRoot();
+            axios
+                .post(`${rootUrl}authnz/${idp}/login`)
+                .then((response) => {
+                    if (response.data.redirect_uri) {
+                        window.location = response.data.redirect_uri;
                     }
                 })
                 .catch((error) => {
