@@ -1,0 +1,20 @@
+config_files:
+  /home/cameron/dev/galaxy/galaxy/config/galaxy.yml.sample:
+    config_type: galaxy
+    instance_name: _default_
+    attribs:
+      app_server: gunicorn
+      log_dir: /home/cameron/dev/galaxy/galaxy/database/gravity/log
+      bind_address: localhost
+      bind_port: 8080
+      galaxy_root: /home/cameron/dev/galaxy/galaxy
+    services:
+    - config_type: galaxy
+      service_type: gunicorn
+      service_name: gunicorn
+    - config_type: galaxy
+      service_type: celery
+      service_name: celery
+    - config_type: galaxy
+      service_type: celery-beat
+      service_name: celery-beat

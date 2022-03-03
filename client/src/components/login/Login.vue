@@ -1,31 +1,41 @@
 <template>
     <div class="container">
-        <div class="row justify-content-md-center">
+        <div></div>
+        <div class="row login">
             <template v-if="!confirmURL">
                 <div class="col col-lg-6">
                     <b-alert :show="messageShow" :variant="messageVariant" v-html="messageText" />
                     <b-form id="login" @submit.prevent="submitGalaxyLogin()">
-                        <b-card no-body header="Welcome to Galaxy, please log in">
+                        <b-card v-if="enable_oidc" no-body header="Sign in using an Australian University ID">
                             <b-card-body>
-                                <div>
-                                    <!-- standard internal galaxy login -->
+                                <!-- OIDC login-->
+                                <external-login :login_page="true" />
+                            </b-card-body>
+                        </b-card>
+
+                        <b-card no-body header="Sign in using another ID">
+                            <b-card-body>
+                                <div v-if="!showOther">
+                                    <b-button name="other" href="#" @click="clickOther">
+                                        <img src="/static/images/au/galaxy-black.svg" style="width: auto; height: 26px; margin-right: 10px; padding: 2px;">
+                                        Sign in with email
+                                    </b-button>
+                                </div>
+
+                                <div v-else>
+                                    <!-- Default internal galaxy login -->
                                     <b-form-group label="Public Name or Email Address">
                                         <b-form-input name="login" type="text" v-model="login" />
                                     </b-form-group>
                                     <b-form-group label="Password">
                                         <b-form-input name="password" type="password" v-model="password" />
                                         <b-form-text>
-                                            Forgot password?
                                             <a @click="reset" href="javascript:void(0)" role="button"
-                                                >Click here to reset your password.</a
+                                                >Forgot password?</a
                                             >
                                         </b-form-text>
                                     </b-form-group>
                                     <b-button name="login" type="submit">Login</b-button>
-                                </div>
-                                <div v-if="enable_oidc">
-                                    <!-- OIDC login-->
-                                    <external-login :login_page="true" />
                                 </div>
                             </b-card-body>
                             <b-card-footer>
@@ -58,7 +68,6 @@
                             subject to termination and data deletion. Connect existing account now to avoid possible
                             loss of data.
                         </p>
-                        -->
                     </b-modal>
                 </div>
             </template>
@@ -70,6 +79,46 @@
             <div v-if="show_welcome_with_login" class="col">
                 <b-embed type="iframe" :src="welcome_url" aspect="1by1" />
             </div>
+        </div>
+
+        <div class="footer">
+            <div class="row">
+                <div class="row logo">
+                    <a href="https://www.melbournebioinformatics.org.au/" target="_blank">
+                        <img src="/static/images/au/logos/melbourne-bioinformatics.png" />
+                    </a>
+
+                    <a href="https://ardc.edu.au/" target="_blank">
+                        <img src="/static/images/au/logos/ardc.png" />
+                    </a>
+
+                    <a href="https://bioplatforms.com/" target="_blank">
+                        <img src="/static/images/au/logos/bpa.png" />
+                    </a>
+
+                    <a href="https://www.biocommons.org.au/" target="_blank">
+                        <img src="/static/images/au/logos/australian-biocommons.png" />
+                    </a>
+
+                    <a href="https://www.qcif.edu.au/" target="_blank">
+                        <img src="/static/images/au/logos/qcif.jpg" />
+                    </a>
+
+                    <a href="https://www.dese.gov.au/ncris" target="_blank">
+                        <img src="/static/images/au/logos/ncris.svg" />
+                    </a>
+
+                    <a href="https://rcc.uq.edu.au/" target="_blank">
+                        <img src="/static/images/au/logos/uq-2.png" />
+                    </a>
+                </div>
+            </div>
+
+            <p class="text-center">
+                The content of this website is licensed under a Creative Commmons Attribute 3.0 Australian License.
+                Please review the Galaxy Australia
+                <a href="">Terms of Use and Policies.</a>
+            </p>
         </div>
     </div>
 </template>
@@ -102,6 +151,7 @@ export default {
     },
     data() {
         const galaxy = getGalaxyInstance();
+        console.log(`oidc_enabled: ${galaxy.config.enable_oidc}`);
         return {
             login: null,
             password: null,
@@ -112,6 +162,7 @@ export default {
             redirect: galaxy.params.redirect,
             session_csrf_token: galaxy.session_csrf_token,
             enable_oidc: galaxy.config.enable_oidc,
+            showOther: false,
         };
     },
     computed: {
@@ -124,6 +175,9 @@ export default {
         },
     },
     methods: {
+        clickOther() {
+            this.showOther = true;
+        },
         toggleLogin() {
             if (this.$root.toggleLogin) {
                 this.$root.toggleLogin();
@@ -175,8 +229,63 @@ export default {
     },
 };
 </script>
+
+<style>
+  #externalLogin {
+    margin-bottom: 2rem;
+  }
+  #externalLogin hr.my-4 {
+    margin: 0.75rem 0;
+    border: none;
+    border-top: none;
+  }
+</style>
+
 <style scoped>
+.center-panel > div > div.container {
+  min-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.login {
+    margin: 1.5rem;
+    width: 100%;
+    max-width: 1200px;
+    justify-content: center;
+}
 .card-body {
     overflow: visible;
+}
+.footer {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+}
+.footer .row {
+    justify-content: center;
+}
+.footer .logo {
+    border-bottom: 1px solid #ddd;
+}
+.footer .logo img {
+    margin: 1rem;
+    height: 50px;
+    width: auto;
+}
+@media only screen and (max-width: 1400px) {
+    .footer .logo img {
+        height: 40px;
+    }
+}
+@media only screen and (max-width: 1200px) {
+    .footer .logo img {
+        height: 30px;
+    }
+}
+@media only screen and (max-width: 1000px) {
+    .footer .logo img {
+        height: 60px;
+    }
 }
 </style>
