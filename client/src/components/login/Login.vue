@@ -6,23 +6,72 @@
                 <div class="col col-lg-6">
                     <b-alert :show="messageShow" :variant="messageVariant" v-html="messageText" />
                     <b-form id="login" @submit.prevent="submitGalaxyLogin()">
-                        <b-card v-if="enable_oidc" no-body header="Sign in using an Australian University ID">
+                        <b-card v-if="enable_oidc" no-body class="text-center mb-4">
+                            <b-card-header>
+                                <p class="mb-0">
+                                    <b>Sign in using an Australian University ID</b>
+                                    <span class="px-3">
+                                        <i
+                                            class="fa fa-info-circle"
+                                            @click="toggleAafInfo"
+                                            style="cursor: pointer;"
+                                        />
+                                    </span>
+                                </p>
+
+                                <div v-if="showAafInfo" class="login-info">
+                                    <small>
+                                        Sign in with your Australian Institute login to access our premium service, which includes higher data limits, additional compute and exclusive tools.
+                                        <a href="https://site.usegalaxy.org.au/about#feature-catalogue" target="_blank">Learn more.</a>
+                                        <br>
+                                        <b>Is your institution registered?</b>
+                                        Check the
+                                        <a href="https://site.usegalaxy.org.au/about/aaf-list" target="_blank">list of AAF institutions</a>.
+                                        <br>
+                                    </small>
+                                </div>
+                            </b-card-header>
+
                             <b-card-body>
-                                <!-- OIDC login-->
-                                <external-login :login_page="true" />
+                                <!-- Hard-coded AAF OIDC login-->
+                                <b-button variant="link" class="my-2" @click="submitOIDCLogin('Keycloak')">
+                                    <img :src="https://swift.rc.nectar.org.au/v1/AUTH_377/public/Galaxy/AAF_BTN_Sign_in_med_gradient_orange_FIN2020.png" height="45" alt="" />
+                                </b-button>
                             </b-card-body>
                         </b-card>
 
-                        <b-card no-body header="Sign in using another ID">
+                        <b-card no-body class="text-center">
+                            <b-card-header>
+                                <p class="mb-0">
+                                    <b>Sign in using another ID</b>
+                                    <span class="px-3">
+                                        <i
+                                            class="fa fa-info-circle"
+                                            @click="toggleOtherInfo"
+                                            style="cursor: pointer;"
+                                        />
+                                    </span>
+                                </p>
+
+                                <div v-if="showOtherInfo" class="login-info">
+                                    <small>
+                                        Sign in as a public user with any email address and password. You may have reduced access to the service, such as lower data limits and less server resources. Please use an
+                                        <a href="https://site.usegalaxy.org.au/list-of-institutions" target="_blank">Australian Institution email</a>,
+                                        if possible.
+                                        <a href="https://site.usegalaxy.org.au/about#feature-catalogue" target="_blank">Learn more.</a>
+                                    </small>
+                                </div>
+                            </b-card-header>
+
                             <b-card-body>
                                 <div v-if="!showOther">
-                                    <b-button name="other" href="#" @click="clickOther">
+                                    <b-button class="my-2" name="other" href="#" @click="clickOther">
                                         <img src="/static/images/au/galaxy-black.svg" style="width: auto; height: 26px; margin-right: 10px; padding: 2px;">
                                         Sign in with email
                                     </b-button>
                                 </div>
 
-                                <div v-else>
+                                <div v-else class="text-left">
                                     <!-- Default internal galaxy login -->
                                     <b-form-group label="Public Name or Email Address">
                                         <b-form-input name="login" type="text" v-model="login" />
@@ -151,7 +200,6 @@ export default {
     },
     data() {
         const galaxy = getGalaxyInstance();
-        console.log(`oidc_enabled: ${galaxy.config.enable_oidc}`);
         return {
             login: null,
             password: null,
@@ -163,6 +211,8 @@ export default {
             session_csrf_token: galaxy.session_csrf_token,
             enable_oidc: galaxy.config.enable_oidc,
             showOther: false,
+            showOtherInfo: false,
+            showAafInfo: false,
         };
     },
     computed: {
@@ -177,6 +227,14 @@ export default {
     methods: {
         clickOther() {
             this.showOther = true;
+        },
+        toggleAafInfo() {
+            this.showAafInfo = !this.showAafInfo;
+        },
+        toggleOtherInfo() {
+            console.log('clickOtherInfo');
+            this.showOtherInfo = !this.showOtherInfo;
+            console.log(`showOtherInfo = ${this.showOtherInfo}`);
         },
         toggleLogin() {
             if (this.$root.toggleLogin) {
@@ -200,6 +258,21 @@ export default {
                         window.location = encodeURI(response.data.redirect);
                     } else {
                         window.location = `${rootUrl}`;
+                    }
+                })
+                .catch((error) => {
+                    this.messageVariant = "danger";
+                    const message = error.response.data && error.response.data.err_msg;
+                    this.messageText = message || "Login failed for an unknown reason.";
+                });
+        },
+        submitOIDCLogin(idp) {
+            const rootUrl = getAppRoot();
+            axios
+                .post(`${rootUrl}authnz/${idp}/login`)
+                .then((response) => {
+                    if (response.data.redirect_uri) {
+                        window.location = response.data.redirect_uri;
                     }
                 })
                 .catch((error) => {
@@ -272,6 +345,9 @@ export default {
     margin: 1rem;
     height: 50px;
     width: auto;
+}
+.login-info {
+    margin: .5rem 0;
 }
 @media only screen and (max-width: 1400px) {
     .footer .logo img {
