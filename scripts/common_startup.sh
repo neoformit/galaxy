@@ -122,7 +122,6 @@ if [ $SET_VENV -eq 1 ] && [ $CREATE_VENV -eq 1 ]; then
                 conda_activate
             fi
             virtualenv "$GALAXY_VIRTUAL_ENV"
-            setup_gravity_state_dir
         else
             # If $GALAXY_VIRTUAL_ENV does not exist, and there is no conda available, attempt to create it.
             if [ -z "$GALAXY_PYTHON" ]; then
@@ -140,21 +139,16 @@ if [ $SET_VENV -eq 1 ] && [ $CREATE_VENV -eq 1 ]; then
             echo "existing environment before starting Galaxy."
             if command -v virtualenv >/dev/null; then
                 virtualenv -p "$GALAXY_PYTHON" "$GALAXY_VIRTUAL_ENV"
-                setup_gravity_state_dir
             else
-                vvers=16.7.9
-                vurl="https://files.pythonhosted.org/packages/source/v/virtualenv/virtualenv-${vvers}.tar.gz"
-                vsha=0d62c70883c0342d59c11d0ddac0d954d0431321a41ab20851facf2b222598f3
+                min_python_version=3.7
+                vurl="https://bootstrap.pypa.io/virtualenv/${min_python_version}/virtualenv.pyz"
                 vtmp=$(mktemp -d -t galaxy-virtualenv-XXXXXX)
                 vsrc="$vtmp/$(basename $vurl)"
-                # SSL certificates are not checked to prevent problems with messed
-                # up client cert environments. We verify the download using a known
-                # good sha256 sum instead.
                 echo "Fetching $vurl"
                 if command -v curl >/dev/null; then
-                    curl --insecure -L -o "$vsrc" "$vurl"
+                    curl -L -o "$vsrc" "$vurl"
                 elif command -v wget >/dev/null; then
-                    wget --no-check-certificate -O "$vsrc" "$vurl"
+                    wget -O "$vsrc" "$vurl"
                 else
                     "$GALAXY_PYTHON" -c "try:
     from urllib import urlretrieve
@@ -162,15 +156,12 @@ except:
     from urllib.request import urlretrieve
 urlretrieve('$vurl', '$vsrc')"
                 fi
-                echo "Verifying $vsrc checksum is $vsha"
-                "$GALAXY_PYTHON" -c "import hashlib; assert hashlib.sha256(open('$vsrc', 'rb').read()).hexdigest() == '$vsha', '$vsrc: invalid checksum'"
-                tar zxf "$vsrc" -C "$vtmp"
-                "$GALAXY_PYTHON" "$vtmp/virtualenv-$vvers/virtualenv.py" "$GALAXY_VIRTUAL_ENV"
+                "$GALAXY_PYTHON" "$vsrc" "$GALAXY_VIRTUAL_ENV"
                 rm -rf "$vtmp"
-                setup_gravity_state_dir
             fi
         fi
     fi
+    setup_gravity_state_dir
 fi
 
 # activate virtualenv or conda env, sets $GALAXY_VIRTUAL_ENV and $GALAXY_CONDA_ENV
@@ -207,6 +198,23 @@ if [ $FETCH_WHEELS -eq 1 ]; then
     fi
 fi
 
+# Install node if not installed
+if [ -n "$VIRTUAL_ENV" ]; then
+    if ! in_venv "$(command -v node)" || [ "$(node --version)" != "v${NODE_VERSION}" ]; then
+        echo "Installing node into $VIRTUAL_ENV with nodeenv."
+        if [ -d "${VIRTUAL_ENV}/lib/node_modules" ]; then
+            echo "Removing old ${VIRTUAL_ENV}/lib/node_modules directory."
+            rm -rf "${VIRTUAL_ENV}/lib/node_modules"
+        fi
+        nodeenv -n "$NODE_VERSION" -p
+    fi
+elif [ -n "$CONDA_DEFAULT_ENV" ] && [ -n "$CONDA_EXE" ]; then
+    if ! in_conda_env "$(command -v node)"; then
+        echo "Installing node into '$CONDA_DEFAULT_ENV' Conda environment with conda."
+        $CONDA_EXE install --yes --override-channels --channel conda-forge --channel defaults --name "$CONDA_DEFAULT_ENV" nodejs="$NODE_VERSION"
+    fi
+fi
+
 # Check client build state.
 if [ $SKIP_CLIENT_BUILD -eq 0 ]; then
     if [ -f static/client_build_hash.txt ]; then
@@ -231,19 +239,6 @@ else
     echo "The Galaxy client build is being skipped due to the SKIP_CLIENT_BUILD environment variable."
 fi
 
-# Install node if not installed
-if [ -n "$VIRTUAL_ENV" ]; then
-    if ! in_venv "$(command -v node)" || [ "$(node --version)" != "v${NODE_VERSION}" ]; then
-        echo "Installing node into $VIRTUAL_ENV with nodeenv."
-        nodeenv -n "$NODE_VERSION" -p
-    fi
-elif [ -n "$CONDA_DEFAULT_ENV" ] && [ -n "$CONDA_EXE" ]; then
-    if ! in_conda_env "$(command -v node)"; then
-        echo "Installing node into '$CONDA_DEFAULT_ENV' Conda environment with conda."
-        $CONDA_EXE install --yes --override-channels --channel conda-forge --channel defaults --name "$CONDA_DEFAULT_ENV" nodejs="$NODE_VERSION"
-    fi
-fi
-
 # Build client if necessary.
 if [ $SKIP_CLIENT_BUILD -eq 0 ]; then
     # Ensure dependencies are installed
@@ -260,10 +255,14 @@ if [ $SKIP_CLIENT_BUILD -eq 0 ]; then
     else
         echo "WARNING: Galaxy client build needed but there is no virtualenv enabled. Build may fail."
     fi
+    # We need galaxy config here, ensure it's set.
+    set_galaxy_config_file_var
+    # Set plugin path
+    GALAXY_PLUGIN_PATH=$(python scripts/config_parse.py --setting=plugin_path --config-file="$GALAXY_CONFIG_FILE")
     # Build client
     cd client
     if yarn install $YARN_INSTALL_OPTS; then
-        if ! yarn run build-production-maps; then
+        if ! (export GALAXY_PLUGIN_PATH="$GALAXY_PLUGIN_PATH"; yarn run build-production-maps;) then
             echo "ERROR: Galaxy client build failed. See ./client/README.md for more information, including how to get help."
             exit 1
         fi
