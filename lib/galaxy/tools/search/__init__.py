@@ -379,10 +379,14 @@ class ToolPanelViewSearch:
             terms=True,
         )
 
-        # !!! log match scores --------------------------------------------
+        # Log match scores
+        # ---------------------------------------------------------------------
+        LOG_RESULT_LIMIT = 5
+
         scores = [
             x[0] for x in hits.top_n
         ][:config.tool_search_limit]
+        hits = hits[:config.tool_search_limit]
 
         log.debug(pprint.pformat([
             {
@@ -390,8 +394,17 @@ class ToolPanelViewSearch:
                 'details': hit['id'],
                 'matched_terms': hit.matched_terms(),
             }
-            for hit, score in zip(hits[:config.tool_search_limit], scores)
+            for hit, score in zip(
+                hits[:LOG_RESULT_LIMIT],
+                scores[:LOG_RESULT_LIMIT]
+            )
         ]))
-        # !!! -------------------------------------------------------------
+        # ---------------------------------------------------------------------
 
-        return [hit["id"] for hit in hits[:config.tool_search_limit]]
+        return [
+            {
+                'score': round(score, 3),
+                'id': hit['id'],
+            }
+            for hit, score in zip(hits, scores)
+        ]

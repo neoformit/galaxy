@@ -147,7 +147,13 @@ class ToolsController(BaseGalaxyAPIController, UsesVisualizationMixin):
             if trans.user and q in SEARCH_RESERVED_TERMS_FAVORITES:
                 if "favorites" in trans.user.preferences:
                     favorites = loads(trans.user.preferences["favorites"])
-                    hits = favorites["tools"]
+                    hits = [
+                        {
+                            'id': tool_id,
+                            'score': None,
+                        }
+                        for tool_id in favorites["tools"]
+                    ]
                 else:
                     hits = None
             else:
@@ -156,9 +162,13 @@ class ToolsController(BaseGalaxyAPIController, UsesVisualizationMixin):
             if hits:
                 for hit in hits:
                     try:
-                        tool = self.service._get_tool(trans, hit, user=trans.user)
+                        tool = self.service._get_tool(
+                            trans, hit['id'], user=trans.user)
                         if tool:
-                            results.append(tool.id)
+                            results.append({
+                                'id': tool.id,
+                                'score': hit['score'],
+                            })
                     except exceptions.AuthenticationFailed:
                         pass
                     except exceptions.ObjectNotFound:
