@@ -16,6 +16,9 @@
         <b-tab v-if="showCollection" id="collection" title="Collection" button-id="tab-title-link-collection">
             <collection :details="details" :has-callback="hasCallback" :selectable="selectable" v-on="$listeners" />
         </b-tab>
+        <b-tab v-if="showArchive" id="archive" title="Archive" button-id="tab-title-link-collection">
+            <archive :details="details" :has-callback="hasCallback" :selectable="selectable" v-on="$listeners" />
+        </b-tab>
         <b-tab v-if="showRules" id="rule-based" title="Rule-based" button-id="tab-title-link-rule-based">
             <rules-input :details="details" :has-callback="hasCallback" :selectable="selectable" v-on="$listeners" />
         </b-tab>
@@ -29,6 +32,7 @@
 import Backbone from "backbone";
 import UploadUtils from "mvc/upload/upload-utils";
 import { getDatatypesMapper } from "components/Datatypes";
+import Archive from "./Archive";
 import Composite from "./Composite";
 import Collection from "./Collection";
 import Default from "./Default";
@@ -39,6 +43,7 @@ import { BTabs, BTab } from "bootstrap-vue";
 
 export default {
     components: {
+        Archive,
         Collection,
         Composite,
         Default,
@@ -116,6 +121,12 @@ export default {
                 return true;
             }
             return this.effectiveExtensions.some((extension) => !!extension.composite_files);
+        },
+        showArchive() {
+
+            // TODO: I'm pretty sure that format restrictions wouldn't apply here, as they'll be sniffed anyway? Unless we do something like filter to archive formats only.
+
+            return true;
         },
         showRegular() {
             if (!this.formatRestricted) {
