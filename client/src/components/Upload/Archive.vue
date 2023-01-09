@@ -112,7 +112,7 @@ import UploadRow from "mvc/upload/default/default-row";
 import UploadBoxMixin from "./UploadBoxMixin";
 import { BButton } from "bootstrap-vue";
 
-// TODO: Handle/pass extensions tar, zip, bagit (others?)
+// TODO: Handle/pass extensions tar, zip, bagit, yaml (others?)
 // Can we just hard-code these?
 
 /*
