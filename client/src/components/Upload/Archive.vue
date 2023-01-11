@@ -11,6 +11,7 @@
                     <th>Name</th>
                     <th>Size</th>
                     <th>Type</th>
+                    <th>Genome</th>
                     <th>Status</th>
                     <th />
                 </tr>
@@ -111,57 +112,24 @@
 import UploadRow from "mvc/upload/default/default-row";
 import UploadBoxMixin from "./UploadBoxMixin";
 import { BButton } from "bootstrap-vue";
+import { uploadModelsToPayload } from "./helpers";  // Probably want to edit this to build archive upload payload
 
-// TODO: Handle/pass extensions tar, zip, bagit, yaml (others?)
-// Can we just hard-code these?
-
-/*
-- What does this.details [Obj] contain?
-    # UploadModalContent:157
-    details() {
-        return {
-            effectiveExtensions: this.effectiveExtensions,
-            listGenomes: this.listGenomes,
-            currentFtp: this.currentFtp,
-            fileSourcesConfigured: this.fileSourcesConfigured,
-            defaultExtension: this.defaultExtension,
-            defaultDbKey: this.defaultDbKey,
-            uploadPath: this.uploadPath,
-            model: this.model,
-            chunkUploadSize: this.chunkUploadSize,
-            history_id: this.currentHistoryId,
-        };
-    },
-
-- this.initCollection()
-    # UploadBoxMixin:329
-    this.collection = new UploadModel.Collection();
-
-- this.initAppProperties()
-    # UploadBoxMixin:329
-    this.listExtensions = this.details.effectiveExtensions;
-    this.listGenomes = this.details.listGenomes;
-    this.ftpUploadSite = this.details.currentFtp;
-    this.fileSourcesConfigured = this.details.fileSourcesConfigured;
-
-- this.collection - is it a galaxy collection or something else?
-    See this.initCollection() above
-*/
+// TODO: Handle/pass extensions tar, zip, bagit, yaml etc?
+// These are hard-coded for now
 
 export default {
     components: { BButton },
     mixins: [UploadBoxMixin],
     props: {
-        multiple: {
+        multiple: {  // Not sure if this needs to be a prop?
             type: Boolean,
-            default: true,
+            // Doesn't make too much sense to upload multiple if we're going to have an extract wizard...
+            default: false,
         },
     },
     data() {
         return {
             uploadUrl: '/api/',
-            // Doesn't make too much sense to upload multiple if we're going to have an extract wizard...
-            multiple: false,
             topInfo: "",
             highlightBox: false,
             showHelper: true,
@@ -192,8 +160,9 @@ export default {
             const archive_extensions = [
                 'tar',
                 'zip',
+                'yaml',    // yaml description?
                 'bagit',
-                'yaml', // yaml description?
+                'rocrate', // extend zip handler?
             ];
             return this.listExtensions.filter((ext) => archive_extensions.includes(ext.id));
         },
@@ -226,7 +195,14 @@ export default {
                 this._eventAnnounce(index, file);
             },
             initialize: (index) => {
-                return uploadModelsToPayload([this.collection.get(index)], this.history_id);
+                return uploadModelsToPayload(
+                    [this.collection.get(index)],
+                    this.history_id,
+                    // Replace these with kwarg props/cfg:
+                    // {extract_to: this._getExtension(index)}
+                    false,
+                    this._getArchiveExtension(index),
+                );
             },
             progress: (index, percentage) => {
                 this._eventProgress(index, percentage);
@@ -269,6 +245,15 @@ export default {
             };
         },
 
+        /** Return elements_from argument based on selected file extension */
+        _getArchiveExtension: function(index) {
+            const ext = this.collection.get(index).attributes.extension;
+            if (["zip", "tar"].includes(ext)) {
+                return 'archive';
+            }
+            return ext; // bagit, yaml, rocrate
+        },
+
         /** Success */
         _eventSuccess: function (index) {
             const it = this.collection.get(index);
@@ -291,6 +276,10 @@ export default {
                 this._updateStateForCounters();
             }
         },
+
+        // _eventComplete: function() {
+            // Start archive wizard?
+        // },
     },
 }
 </script>

@@ -5,7 +5,7 @@ function itemIsUrl(item) {
     return URI_PREFIXES.some((prefix) => item.get("url_paste").startsWith(prefix));
 }
 
-export function uploadModelsToPayload(items, history_id, composite = false) {
+export function uploadModelsToPayload(items, history_id, composite=false, elements_from=null) {
     const files = [];
     const elements = items
         .map((item) => {
@@ -100,6 +100,9 @@ export function uploadModelsToPayload(items, history_id, composite = false) {
         ];
         delete target["elements"];
         target["items"] = compositeItems;
+    } else if (elements_from) {
+        // This is shit but we're testing for now
+        target.elements[0].elements_from = elements_from;
     }
     return {
         history_id: history_id,

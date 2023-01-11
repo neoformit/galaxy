@@ -1,6 +1,7 @@
 import argparse
 import errno
 import json
+import logging
 import os
 import shutil
 import sys
@@ -38,6 +39,7 @@ from galaxy.util.hash_util import (
 )
 
 DESCRIPTION = """Data Import Script"""
+log = logging.getLogger(__name__)
 
 
 def main(argv=None):
@@ -92,7 +94,9 @@ def _fetch_target(upload_config: "UploadConfig", target):
     def expand_elements_from(target_or_item):
         elements_from = target_or_item.get("elements_from", None)
         items = None
+
         if elements_from:
+            log.debug(f"Expanding uploaded elements from [{elements_from}]...")
             if elements_from == "archive":
                 decompressed_directory = _decompress_target(upload_config, target_or_item)
                 items = _directory_to_items(decompressed_directory)
