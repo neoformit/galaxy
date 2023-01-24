@@ -225,7 +225,9 @@ export default {
          * @param{Array} items - Upload items/rows filtered from a collection
          */
         toData: function (items, history_id, composite = false) {
-            return uploadModelsToPayload(items, history_id, composite);
+            return uploadModelsToPayload(items, history_id, {
+                'composite': composite,
+            });
         },
         immediateUpload: function (files) {
             this.$refs.regular?.addFiles(files);

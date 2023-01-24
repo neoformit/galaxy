@@ -161,7 +161,9 @@ export default {
             });
             submitUpload({
                 url: this.details.uploadPath,
-                data: uploadModelsToPayload(this.collection.filter(), this.history_id, true),
+                data: uploadModelsToPayload(this.collection.filter(), this.history_id, {
+                    composite: true,
+                }),
                 success: (message) => {
                     this._eventSuccess(message);
                 },
