@@ -1,5 +1,4 @@
 <template>
-    <!-- Drag-and-drop archives here to populate an archive tree -->
     <div>
 
     </div>
@@ -7,8 +6,12 @@
 
 <script>
 export default {
+    name: 'ArchiveTree',
     props: {
-        elements,
+        elements: {
+            type: Object,
+            default: null,
+        }
     },
     data() {
         return {

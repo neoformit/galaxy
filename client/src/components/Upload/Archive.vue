@@ -97,6 +97,15 @@
                 <span class="fa fa-folder-open-o"></span>{{ btnFilesTitle }}
             </b-button>
             <b-button
+                id="btn-history"
+                ref="btnHistory"
+                class="ui-button-default"
+                :title="btnHistoryTitle"
+                :disabled="!enableSources"
+                @click="selectFromHistory">
+                <span class="fa fa-database"></span>{{ btnHistoryTitle }}
+            </b-button>
+            <b-button
                 id="btn-local"
                 ref="btnLocal"
                 class="ui-button-default"
@@ -110,18 +119,30 @@
 </template>
 
 <script>
+import ArchiveTree from "./Archive/ArchiveTree";
+import UploadBoxMixin from "./UploadBoxMixin";
+import UploadRow from "mvc/upload/default/default-row";
 import { BButton } from "bootstrap-vue";
 import { uploadModelsToPayload } from "./helpers";
-import ArchiveTree from "./ArchiveTree";
+
+// We won't use an UploadRow as we only want to upload one archive at a time
+// So we create a new component that will handle the archive contents?
 
 // TODO: Handle/pass extensions tar, zip, bagit, yaml etc?
 // These are hard-coded for now
 
-export default {
-    components: { BButton },
-    props: {
+const ARCHIVE_EXTENSIONS = [
+    'tar',
+    'zip',
+    // 'yaml',    // yaml description? what is that?
+];
 
+export default {
+    components: {
+        BButton,
+        ArchiveTree,
     },
+    mixins: [UploadBoxMixin],
     data() {
         return {
             uploadUrl: '/api/',
@@ -133,45 +154,97 @@ export default {
             extension: this.details.defaultExtension,
             listExtensions: [],
             running: false,
+            multiple: false,
+            rowUploadModel: UploadRow,
+            archiveElements: {},
+            counterAnnounce: 0,
+            counterSuccess: 0,
+            counterError: 0,
+            counterRunning: 0,
+            uploadSize: 0,
+            uploadCompleted: 0,
             enableReset: false,
             enableStart: false,
             enableSources: false,
-            btnLocalTitle: _l("Choose local files"),
-            btnCreateTitle: _l("Paste/Fetch data"),
+            highlightBox: false,
+            btnLocalTitle: _l("Choose local file"),
+            btnHistoryTitle: _l("Select from history"),
+            btnCreateTitle: _l("Fetch remote file"),
+            btnFtpTitle: _l("Choose FTP file"),
             btnStartTitle: _l("Start"),
             btnStopTitle: _l("Pause"),
             btnResetTitle: _l("Reset"),
-            archiveElements: [],
         };
     },
     computed: {
         extensions() {
-            // TODO: How do we handle archive extensions? Where do they come from?
-            const archive_extensions = [
-                'tar',
-                'zip',
-                // 'yaml',    // yaml description?
-            ];
-            return this.listExtensions.filter((ext) => archive_extensions.includes(ext.id));
+            return this.listExtensions.filter(
+                (ext) => ARCHIVE_EXTENSIONS.includes(ext.id));
         },
         appModel() {
-            return this.details.model;  // TODO: what does 'details' contain?
+            // TODO: what does 'details' contain?
+            return this.details.model;
         },
     },
     created() {
 
     },
     mounted() {
-
+        this.initExtensionInfo();
+        this.initFtpPopover();
+        this.initUploadbox({
+            initUrl: (index) => {
+                if (!this.uploadUrl) {
+// TODO             this.uploadUrl = this.getRequestUrl([this.collection.get(index)], this.history_id);
+                }
+                return this.uploadUrl;
+            },
+            announce: (index, file) => {
+                this._eventAnnounce(index, file);
+            },
+            initialize: (index) => {
+// TODO         return uploadModelsToPayload([this.collection.get(index)], this.history_id);
+            },
+            progress: (index, percentage) => {
+                this._eventProgress(index, percentage);
+            },
+            success: (index, message) => {
+                this._eventSuccess(index, message);
+            },
+            warning: (index, message) => {
+                this._eventWarning(index, message);
+            },
+            error: (index, message) => {
+                this._eventError(index, message);
+            },
+            complete: () => {
+                this._eventComplete();
+            },
+            ondragover: () => {
+                this.highlightBox = true;
+            },
+            ondragleave: () => {
+                this.highlightBox = false;
+            },
+            chunkSize: this.details.chunkUploadSize,
+        });
     },
     methods: {
         _eventStart() {
-            // Build collection of files for upload before start (UploadBoxMixin)
+/* There are a few different ways to go here...
 
-            // Be good if we could just create a set of standard upload rows with selected elements?
-            // Rows should point to temp files for upload but need to defer extraction until upload..?
+See UploadBoxMixin:_eventStart for parent method
 
-            // Then call uploadModelsToPayload()
+~~ Local archive ~~
+1 - Extract selected data from archive to temp data files on client
+2 - Upload temp data files with standard API endpoints
+
+~~ Remote archive ~~
+Upload archive file with manifest to extract on server by either:
+    1 - Extract and flatten entire archive to collection
+    2 - Return archive manifest and allow user to select files to extract
+
+*/
         },
         _eventStop() {
 
@@ -179,6 +252,9 @@ export default {
         _eventReset() {
 
         },
+        selectFromHistory() {
+            // show "select from history" component
+        }
     },
 }
 </script>
