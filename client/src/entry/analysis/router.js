@@ -14,6 +14,7 @@ import WorkflowEditorModule from "entry/analysis/modules/WorkflowEditor";
 // routes
 import AdminRoutes from "entry/analysis/routes/admin-routes";
 import LibraryRoutes from "entry/analysis/routes/library-routes";
+import StorageDashboardRoutes from "entry/analysis/routes/storageDashboardRoutes";
 
 // child components
 import Citations from "components/Citation/Citations";
@@ -45,6 +46,7 @@ import Sharing from "components/Sharing/Sharing";
 import StoredWorkflowInvocations from "components/Workflow/StoredWorkflowInvocations";
 import ToolsJson from "components/ToolsView/ToolsSchemaJson/ToolsJson";
 import ToolsList from "components/ToolsList/ToolsList";
+import ToolSuccess from "components/Tool/ToolSuccess";
 import TourList from "components/Tour/TourList";
 import TourRunner from "components/Tour/TourRunner";
 import TrsImport from "components/Workflow/Import/TrsImport";
@@ -63,7 +65,6 @@ import { CloudAuth } from "components/User/CloudAuth";
 import { ExternalIdentities } from "components/User/ExternalIdentities";
 import { HistoryExport } from "components/HistoryExport/index";
 import HistoryExportTasks from "components/History/Export/HistoryExport";
-import { StorageDashboardRouter } from "components/User/DiskUsage";
 
 Vue.use(VueRouter);
 
@@ -86,6 +87,7 @@ export function getRouter(Galaxy) {
         routes: [
             ...AdminRoutes,
             ...LibraryRoutes,
+            ...StorageDashboardRoutes,
             /** Login entry route */
             { path: "/login/start", component: Login },
             /** Page editor */
@@ -235,6 +237,12 @@ export function getRouter(Galaxy) {
                         props: true,
                     },
                     {
+                        path: "histories/:actionId",
+                        component: GridHistory,
+                        props: true,
+                        redirect: redirectAnon(),
+                    },
+                    {
                         path: "histories/:historyId/export",
                         get component() {
                             return Galaxy.config.enable_celery_tasks ? HistoryExportTasks : HistoryExport;
@@ -242,13 +250,13 @@ export function getRouter(Galaxy) {
                         props: true,
                     },
                     {
-                        path: "histories/:actionId",
-                        component: GridHistory,
-                        props: true,
-                    },
-                    {
                         path: "interactivetool_entry_points/list",
                         component: InteractiveTools,
+                    },
+                    {
+                        path: "jobs/submission/success",
+                        component: ToolSuccess,
+                        props: true,
                     },
                     {
                         path: "jobs/:jobId/view",
@@ -305,11 +313,6 @@ export function getRouter(Galaxy) {
                             item: "page",
                             plural: "Pages",
                         }),
-                    },
-                    {
-                        path: "storage",
-                        component: StorageDashboardRouter,
-                        redirect: redirectAnon(),
                     },
                     {
                         path: "tours",
@@ -447,6 +450,10 @@ export function getRouter(Galaxy) {
                         path: "workflows/list",
                         component: WorkflowList,
                         redirect: redirectAnon(),
+                        props: (route) => ({
+                            importMessage: route.query["message"],
+                            importStatus: route.query["status"],
+                        }),
                     },
                     {
                         path: "workflows/run",

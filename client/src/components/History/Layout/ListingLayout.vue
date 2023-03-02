@@ -8,6 +8,8 @@
             :offset="offset"
             :data-sources="items"
             :data-component="{}"
+            :estimate-size="estimatedItemHeight"
+            :keeps="estimatedItemCount"
             @scroll="onScroll">
             <template v-slot:item="{ item }">
                 <slot name="item" :item="item" :current-offset="getOffset()" />
@@ -20,8 +22,9 @@
 </template>
 <script>
 import VirtualList from "vue-virtual-scroll-list";
-import { throttle } from "lodash";
 import LoadingSpan from "components/LoadingSpan";
+import { useElementBounding } from "@vueuse/core";
+import { computed, ref } from "vue";
 
 export default {
     components: {
@@ -34,51 +37,38 @@ export default {
         items: { type: Array, default: null },
         queryKey: { type: String, default: null },
     },
+    setup() {
+        const listing = ref(null);
+        const { height } = useElementBounding(listing);
+
+        const estimatedItemHeight = 40;
+        const estimatedItemCount = computed(() => {
+            const baseCount = Math.ceil(height.value / estimatedItemHeight);
+            return baseCount + 20;
+        });
+
+        return { listing, estimatedItemHeight, estimatedItemCount };
+    },
     data() {
         return {
-            throttlePeriod: 20,
-            deltaMax: 20,
+            previousStart: undefined,
         };
     },
     watch: {
         queryKey() {
-            this.$refs.listing.scrollToOffset(0);
+            this.listing.scrollToOffset(0);
         },
-    },
-    created() {
-        this.onScrollThrottle = throttle((event) => {
-            this.onScroll(event);
-        }, this.throttlePeriod);
     },
     methods: {
-        onScrollHandler(event) {
-            /* CURRENTLY UNUSED
-            // this avoids diagonal scrolling, we either scroll left/right or top/down
-            // both events are throttled and the default handler has been prevented.
-            if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
-                // handle vertical scrolling with virtual scroller
-                const listing = this.$refs.listing;
-                const deltaMax = this.deltaMax;
-                const deltaY = Math.max(Math.min(event.deltaY, deltaMax), -deltaMax);
-                this.offset = Math.max(0, listing.getOffset() + deltaY);
-                this.$refs.listing.scrollToOffset(this.offset);
-            } else {
-                // dispatch horizontal scrolling as regular event
-                var wheelEvent = new WheelEvent("wheel", {
-                    deltaX: event.deltaX,
-                    bubbles: true,
-                    cancelable: false,
-                });
-                event.target.dispatchEvent(wheelEvent);
-            }
-            */
-        },
         onScroll() {
-            const rangeStart = this.$refs.listing.range.start;
-            this.$emit("scroll", rangeStart);
+            const rangeStart = this.listing.range.start;
+            if (this.previousStart !== rangeStart) {
+                this.previousStart = rangeStart;
+                this.$emit("scroll", rangeStart);
+            }
         },
         getOffset() {
-            return this.$refs.listing?.getOffset() || 0;
+            return this.listing?.getOffset() || 0;
         },
     },
 };

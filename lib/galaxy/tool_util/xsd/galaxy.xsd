@@ -59,6 +59,11 @@ List of behavior changes associated with profile versions:
 
 - Do not strip leading and trailing whitespaces in `from_work_dir` attribute.
 
+### 23.0
+
+- Text parameters that are inferred to be optional (i.e the `optional` tag is not set, but the tool parameter accepts an empty string)
+  are set to `None` for templating in Cheetah. Older tools receive the empty string `""` as the templated value.
+
 ### Examples
 
 A normal tool:
@@ -237,7 +242,7 @@ a short [SPDX](https://spdx.org/licenses/) identifier for a license for this too
 wrapper. The tool wrapper version can be indepedent of the underlying tool. This
 license covers the tool XML and associated scripts shipped with the tool.
 
-This is interpreted as [schema.org/license](https://schema.org/license)).
+This is interpreted as [schema.org/license](https://schema.org/license) property.
 </xs:documentation>
         </xs:annotation>
       </xs:attribute>
@@ -1537,6 +1542,25 @@ of ``type`` ``data``.</xs:documentation>
         <xs:documentation xml:lang="en">Comma separated list of tags to apply to the dataset (only works for elements of collections - e.g. ``element`` XML tags).</xs:documentation>
       </xs:annotation>
     </xs:attribute>
+    <xs:attribute name="location" type="xs:anyURI" gxdocs:added="23.1">
+      <xs:annotation>
+        <xs:documentation xml:lang="en">URL that points to a remote input file that will be downloaded and used as input.
+Please use this option only when is not possible to include the files in the `test-data` folder, since
+this is more error prone due to external factors like remote availability.
+You can use it in two ways:
+- In combination with `value` it will look for the input file specified in `value`, if it's not available on disk it will
+download the file pointed by `location` using the same name as in `value` and then use it as input.
+- Specifiying the `location` without a `value`, it will download the file and use it as an alias of `value`. The name of the file
+will be infered from the last component of the location URL. For example, `location="https://my_url/my_file.txt"` will be equivalent to `value="my_file.txt"`.
+If you specify a `checksum`, it will be also used to check the integrity of the download.</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="checksum" type="xs:string" gxdocs:added="23.1">
+      <xs:annotation>
+        <xs:documentation xml:lang="en">If specified in combination with `location`, after downloading the test input file, the checksum should match the value specified
+here. This value should have the form ``hash_type$hash_value`` (e.g. ``sha1$8156d7ca0f46ed7abac98f82e36cfaddb2aca041``).</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
   </xs:complexType>
   <xs:complexType name="TestCompositeData">
     <xs:annotation>
@@ -1581,6 +1605,29 @@ using the parameters defined in the ``<param>`` tag sets and generate a
 temporary file, which will either be compared with the file named in the
 ``file`` attribute value or checked against assertions made by a child
 ``assert_contents`` tag to verify that the tool is functionally correct.
+
+Different methods can be chosen for the comparison with the local file specified
+by ``file`` using the ``compare`` attribute:
+
+- ``diff``: uses diff to compare the history data set and the file provided by
+  ``file``. Compressed files are decompressed before the compariopm if
+  ``decompress`` is set to ``true``. BAM files are converted to SAM before the
+  comparision and for pdf some special rules are implemented. The number of
+  allowed differences can be set with ``lines_diff``.  If ``sort="true"`` history
+  and local data is sorted before the comparison.
+- ``re_match``: each line of the history data set is compared to the regular
+  expression specified in the corresponding line of the ``file``. The allowed
+  number of non matching lines can be set with ``lines_diff`` and the history
+  dataset is sorted if ``sort`` is set to ``true``.
+- ``re_match_multiline``: it is checked if the history data sets matches the
+  multi line regular expression given in ``file``. The history dataset is sorted
+  before the comparison if the ``sort`` atrribute is set to ``true``.
+- ``contains``: check if each line in ``file`` is contained in the history data set.
+  The allowed number of lines that are not contained in the history dataset
+  can be set with ``lines_diff``.
+- ``sim_size``: compares the size of the history dataset and the ``file`` subject to
+  the values of the ``delta`` and ``delta_frac`` attributes. Note that a ``has_size``
+  content assertion should be preferred, because this avoids storing the test file.
 
         ]]></xs:documentation>
     </xs:annotation>
@@ -1631,9 +1678,12 @@ data type. If these do not match, the test will fail.
     </xs:attribute>
     <xs:attribute name="sort" type="PermissiveBoolean">
       <xs:annotation>
-        <xs:documentation xml:lang="en">This flag causes the lines of the output
-to be sorted before they are compared to the expected output. This could be
-useful for non-deterministic output.</xs:documentation>
+        <xs:documentation xml:lang="en"><![CDATA[
+
+Applies only if ``compare`` is ``diff``, ``re_match`` or ``re_match_multiline``. This flag causes the lines of the history data set to be sorted before the comparison. In case of ``diff`` and ``re_match`` also the local file is sorted. This could be
+useful for non-deterministic output.
+
+]]></xs:documentation>
       </xs:annotation>
     </xs:attribute>
     <xs:attribute name="value" type="xs:string">
@@ -1668,7 +1718,7 @@ it may be inconvenient to upload the entiry file and this can be used instead.
     </xs:attribute>
     <xs:attribute name="lines_diff" type="xs:integer">
       <xs:annotation>
-        <xs:documentation xml:lang="en">If ``compare`` is set to ``diff``, the number of lines of difference to allow (each line with a modification is a line added and a line removed so this counts as two lines).</xs:documentation>
+        <xs:documentation xml:lang="en">Applies only if ``compare`` is set to ``diff``, ``re_match``, and ``contains``. If ``compare`` is set to ``diff``, the number of lines of difference to allow (each line with a modification is a line added and a line removed so this counts as two lines).</xs:documentation>
       </xs:annotation>
     </xs:attribute>
     <xs:attribute name="decompress" type="PermissiveBoolean">
@@ -1691,6 +1741,19 @@ When this attribute is true and ``compare`` is set to ``diff``, try to decompres
     <xs:attribute name="count" type="xs:integer">
       <xs:annotation>
         <xs:documentation xml:lang="en">Number or datasets for this output. Should be used for outputs with ``discover_datasets``</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="location" type="xs:anyURI" gxdocs:added="23.1">
+      <xs:annotation>
+        <xs:documentation xml:lang="en">URL that points to a remote output file that will downloaded and used for output comparison.
+Please use this option only when is not possible to include the files in the `test-data` folder, since
+this is more error prone due to external factors like remote availability.
+You can use it in two ways:
+- In combination with `file` it will look for the output file in the `test-data` folder, if it's not available on disk it will
+download the file pointed by `location` using the same name as in `file` (or `value`).
+- Specifiying the `location` without a `file` (or `value`), it will download the file and use it as an alias of `file`. The name of the file
+will be infered from the last component of the location URL. For example, `location="https://my_url/my_file.txt"` will be equivalent to `file="my_file.txt"`.
+If you specify a `checksum`, it will be also used to check the integrity of the download.</xs:documentation>
       </xs:annotation>
     </xs:attribute>
   </xs:complexType>
@@ -2044,6 +2107,7 @@ module.
       <xs:group ref="TestAssertionsTabular" minOccurs="0" maxOccurs="unbounded"/>
       <xs:group ref="TestAssertionsArchive" minOccurs="0" maxOccurs="unbounded"/>
       <xs:group ref="TestAssertionsXml" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:group ref="TestAssertionsJson" minOccurs="0" maxOccurs="unbounded"/>
       <xs:group ref="TestAssertionsH5" minOccurs="0" maxOccurs="unbounded"/>
     </xs:choice>
   </xs:complexType>
@@ -2098,6 +2162,15 @@ module.
       <xs:element name="attribute_matches" type="AssertAttributeMatches"/>
       <xs:element name="attribute_is" type="AssertAttributeIs"/>
       <xs:element name="element_text" type="AssertElementText"/>
+    </xs:choice>
+  </xs:group>
+  <xs:group name="TestAssertionsJson">
+    <xs:annotation>
+      <xs:documentation xml:lang="en"><![CDATA[Assertions for JSON data]]></xs:documentation>
+    </xs:annotation>
+    <xs:choice>
+      <xs:element name="has_json_property_with_value" type="AssertHasJsonPropertyWithValue"/>
+      <xs:element name="has_json_property_with_text" type="AssertHasJsonPropertyWithText"/>
     </xs:choice>
   </xs:group>
   <xs:group name="TestAssertionsH5">
@@ -2330,6 +2403,7 @@ $attribute_list::5
       <xs:group ref="TestAssertionsGeneral" minOccurs="0" maxOccurs="unbounded"/>
       <xs:group ref="TestAssertionsText" minOccurs="0" maxOccurs="unbounded"/>
       <xs:group ref="TestAssertionsTabular" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:group ref="TestAssertionsJson" minOccurs="0" maxOccurs="unbounded"/>
       <xs:group ref="TestAssertionsXml" minOccurs="0" maxOccurs="unbounded"/>
       <xs:group ref="TestAssertionsH5" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
@@ -2581,6 +2655,46 @@ $attribute_list::5
     <xs:attributeGroup ref="AssertAttributePath"/>
     <xs:attributeGroup ref="AssertAttributeNegate"/>
   </xs:complexType>
+  <xs:complexType name="AssertHasJsonPropertyWithValue">
+    <xs:annotation>
+      <xs:documentation xml:lang="en"><![CDATA[
+Asserts the JSON document contains a property or key with the specified JSON value.
+
+```xml
+<has_json_property_with_value property="skipped_columns" value="[1, 3, 5]" />
+```
+
+$attribute_list::5
+]]>
+      </xs:documentation>
+    </xs:annotation>
+    <xs:attributeGroup ref="AssertAttributeProperty"/>
+    <xs:attribute name="value" type="xs:string" use="required">
+      <xs:annotation>
+        <xs:documentation xml:lang="en">JSON-ified value to search for. This will be converted from an XML string to JSON with Python's json.loads function.</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+  </xs:complexType>
+  <xs:complexType name="AssertHasJsonPropertyWithText">
+    <xs:annotation>
+      <xs:documentation xml:lang="en"><![CDATA[
+Asserts the JSON document contains a property or key with the specified text (i.e. string) value.
+
+```xml
+<has_json_property_with_text property="color" text="red" />
+```
+
+$attribute_list::5
+]]>
+      </xs:documentation>
+    </xs:annotation>
+    <xs:attributeGroup ref="AssertAttributeProperty"/>
+    <xs:attribute name="text" type="xs:string" use="required">
+      <xs:annotation>
+        <xs:documentation xml:lang="en">Text value to search for.</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+  </xs:complexType>
   <xs:complexType name="AssertHasH5Keys">
     <xs:annotation>
       <xs:documentation xml:lang="en"><![CDATA[
@@ -2629,6 +2743,14 @@ $attribute_list::5
     <xs:attribute name="path" type="xs:string" use="required">
       <xs:annotation>
         <xs:documentation xml:lang="en">Path to check for. Valid paths are the simplified subsets of XPath implemented by lxml.etree; https://lxml.de/xpathxslt.html for more information.</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+  </xs:attributeGroup>
+
+  <xs:attributeGroup name="AssertAttributeProperty">
+    <xs:attribute name="property" type="xs:string" use="required">
+      <xs:annotation>
+        <xs:documentation xml:lang="en">JSON property to search the target for.</xs:documentation>
       </xs:annotation>
     </xs:attribute>
   </xs:attributeGroup>
@@ -3248,7 +3370,7 @@ $attribute_list:data_ref,dynamic_options,display,multiple:5
 
 This parameter type is used to select columns from a parameter.
 
-$attribute_list:force_select,numerical,use_header_name:5
+$attribute_list:force_select,numerical,use_header_name,multiple:5
 
 #### ``drill_down``
 
@@ -3258,7 +3380,7 @@ all leaf nodes in the subtree are used.
 
 See [drill_down.xml](https://github.com/galaxyproject/galaxy/blob/dev/test/functional/tools/drill_down.xml)
 
-$attribute_list:hierarchy:5
+$attribute_list:hierarchy,multiple:5
 
 #### ``data_collection``
 
@@ -3459,7 +3581,11 @@ or ``select``.
         </xs:attribute>
         <xs:attribute name="accept_default" type="PermissiveBoolean">
           <xs:annotation>
-            <xs:documentation xml:lang="en"></xs:documentation>
+            <xs:documentation xml:lang="en"><![CDATA[
+Deprecated. Take the value given by ``default_value`` (or ``value``) and ``1``
+if no ``value`` is given. Applies to ``data_column`` and ``group_tag``
+parameters.
+            ]]></xs:documentation>
           </xs:annotation>
         </xs:attribute>
         <xs:attribute name="refresh_on_change" type="PermissiveBoolean">
@@ -3969,14 +4095,17 @@ dataset for the contained input of the type specified using the ``type`` tag.
   <xs:complexType name="ParamOptions">
     <xs:annotation>
       <xs:documentation xml:lang="en"><![CDATA[
-
 See [/tools/extract/liftOver_wrapper.xml](https://github.com/galaxyproject/galaxy/blob/master/tools/extract/liftOver_wrapper.xml)
 for an example of how to use this tag set. This tag set is optionally contained
 within the ``<param>`` tag when the ``type`` attribute value is ``select`` or
-``data`` and used to dynamically generated lists of options. This tag set
-dynamically creates a list of options whose values can be
-obtained from a predefined file stored locally or a dataset selected from the
-current history.
+``data`` and used to dynamically generated lists of options.
+
+For data parameters this tag can be used to restrict possible input datasets to datasets that match the ``dbkey`` of another data input by including a ``data_meta`` filter. See for
+instance here: [/tools/maf/interval2maf.xml](https://github.com/galaxyproject/galaxy/blob/master/tools/maf/interval2maf.xml)
+
+For select parameters this tag set dynamically creates a list of options whose
+values can be obtained from a predefined file stored locally or a dataset
+selected from the current history.
 
 There are at least five basic ways to use this tag - four of these correspond to
 a ``from_XXX`` attribute on the ``options`` directive and the other is to
@@ -5655,22 +5784,30 @@ Source of the tabular data ``from_data_table``, ``from_param``, or ``from_file``
     </xs:attribute>
     <xs:attribute name="name" type="xs:string">
       <xs:annotation>
-        <xs:documentation xml:lang="en"></xs:documentation>
+        <xs:documentation xml:lang="en"><![CDATA[
+Name of the referred data table, parameter, or file (required).
+        ]]></xs:documentation>
       </xs:annotation>
     </xs:attribute>
     <xs:attribute name="column" type="xs:integer">
       <xs:annotation>
-        <xs:documentation xml:lang="en"></xs:documentation>
+        <xs:documentation xml:lang="en"><![CDATA[
+The column to choose the value from (required)
+        ]]></xs:documentation>
       </xs:annotation>
     </xs:attribute>
     <xs:attribute name="offset" type="xs:integer">
       <xs:annotation>
-        <xs:documentation xml:lang="en"></xs:documentation>
+        <xs:documentation xml:lang="en"><![CDATA[
+The row (of the options) to choose the value from (by default -1, ie. last row)
+        ]]></xs:documentation>
       </xs:annotation>
     </xs:attribute>
     <xs:attribute name="param_attribute" type="xs:string">
       <xs:annotation>
-        <xs:documentation xml:lang="en"></xs:documentation>
+        <xs:documentation xml:lang="en"><![CDATA[
+Applies to ``from_param``. The attribute of the parameter to use.
+        ]]></xs:documentation>
       </xs:annotation>
     </xs:attribute>
   </xs:complexType>
@@ -5709,7 +5846,7 @@ of this directive.
       ]]></xs:documentation>
     </xs:annotation>
     <xs:sequence>
-      <xs:element name="action" type="Action" minOccurs="1" maxOccurs="unbounded"/>
+      <xs:group ref="ActionsElement" minOccurs="1" maxOccurs="unbounded"/>
     </xs:sequence>
     <xs:attribute name="value" type="xs:string" use="optional">
       <xs:annotation>
@@ -5834,6 +5971,13 @@ Applies to ``param_value``, ``boolean``</xs:documentation>
         ]]></xs:documentation>
       </xs:annotation>
     </xs:attribute>
+    <xs:attribute name="iterate" type="PermissiveBoolean">
+      <xs:annotation>
+        <xs:documentation xml:lang="en"><![CDATA[
+Applies to ``insert_column``. Default is ``False``</xs:documentation>
+        ]]></xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
     <xs:attribute name="param_attribute" type="xs:string">
       <xs:annotation>
         <xs:documentation xml:lang="en">
@@ -5846,9 +5990,9 @@ Applies to ``param_value``</xs:documentation>
         <xs:documentation xml:lang="en">Applies to ``multiple_splitter``</xs:documentation>
       </xs:annotation>
     </xs:attribute>
-    <xs:attribute name="strip" type="PermissiveBoolean">
+    <xs:attribute name="strip" type="xs:string">
       <xs:annotation>
-        <xs:documentation xml:lang="en">Applies to ``column_strip``</xs:documentation>
+        <xs:documentation xml:lang="en">Applies to ``column_strip``. The given string is removed from the start or end of the column.</xs:documentation>
       </xs:annotation>
     </xs:attribute>
     <xs:attribute name="old_column" type="xs:string">
@@ -7004,7 +7148,7 @@ and ``bibtex`` are the only supported options.</xs:documentation>
       <xs:documentation xml:lang="en">Type of comparison to use when comparing
 test generated output files to expected output files. Currently valid value are
 ``diff`` (the default), ``re_match``, ``re_match_multiline``,
-and ``contains``. In addtion there is ``sim_size`` which is discouraged in fafour of a ``has_size`` assertion.</xs:documentation>
+and ``contains``. In addition there is ``sim_size`` which is discouraged in favour of a ``has_size`` assertion.</xs:documentation>
     </xs:annotation>
     <xs:restriction base="xs:string">
       <xs:enumeration value="diff"/>
@@ -7031,7 +7175,7 @@ and ``contains``. In addtion there is ``sim_size`` which is discouraged in fafou
   </xs:simpleType>
   <xs:simpleType name="Bytes">
     <xs:annotation>
-      <xs:documentation xml:lang="en">Number of bytes alowing for suffix (k|K|M|G|P|E)i? </xs:documentation>
+      <xs:documentation xml:lang="en">Number of bytes allowing for suffix (k|K|M|G|P|E)i? </xs:documentation>
     </xs:annotation>
     <xs:restriction base="xs:string">
       <xs:pattern value="(0|[1-9][0-9]*)([kKMGTPE]i?)?"></xs:pattern>

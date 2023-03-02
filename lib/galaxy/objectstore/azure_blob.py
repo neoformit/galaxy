@@ -28,7 +28,7 @@ from galaxy.util import (
 )
 from galaxy.util.path import safe_relpath
 from galaxy.util.sleeper import Sleeper
-from ..objectstore import (
+from . import (
     ConcreteObjectStore,
     convert_bytes,
 )
@@ -400,9 +400,7 @@ class AzureBlobObjectStore(ConcreteObjectStore):
         return False
 
     def _create(self, obj, **kwargs):
-
         if not self._exists(obj, **kwargs):
-
             # Pull out locally used fields
             extra_dir = kwargs.get("extra_dir", None)
             extra_dir_at_root = kwargs.get("extra_dir_at_root", False)

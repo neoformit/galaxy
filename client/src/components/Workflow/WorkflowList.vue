@@ -1,6 +1,9 @@
 <template>
     <div>
         <b-alert class="index-grid-message" :variant="messageVariant" :show="showMessage">{{ message }}</b-alert>
+        <b-alert class="index-grid-message" dismissible :variant="importStatus" :show="Boolean(importMessage)">
+            {{ importMessage }}
+        </b-alert>
         <b-row class="mb-3">
             <b-col cols="6" class="m-1">
                 <index-filter
@@ -12,10 +15,10 @@
                 </index-filter>
             </b-col>
             <b-col>
-                <WorkflowIndexActions :root="root" class="float-right"> </WorkflowIndexActions>
+                <WorkflowIndexActions :root="root" class="float-right"></WorkflowIndexActions>
             </b-col>
         </b-row>
-        <b-table v-model="workflowItemsModel" :fields="fields" :items="provider" v-bind="indexTableAttrs">
+        <b-table v-model="workflowItemsModel" no-sort-reset :fields="fields" :items="provider" v-bind="indexTableAttrs">
             <template v-slot:empty>
                 <loading-span v-if="loading" message="Loading workflows" />
                 <b-alert v-else id="no-workflows" variant="info" show>
@@ -150,6 +153,14 @@ export default {
         inputDebounceDelay: {
             type: Number,
             default: 500,
+        },
+        importMessage: {
+            type: String,
+            default: null,
+        },
+        importStatus: {
+            type: String,
+            default: "success",
         },
     },
     data() {

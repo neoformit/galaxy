@@ -939,7 +939,8 @@ class HistoriesContentsService(ServiceBase, ServesExportStores, ConsumesModelSto
         Allows additional filtering of contents and custom serialization.
         """
         history = self._get_history(trans, history_id)
-        filters = self.history_contents_filters.parse_query_filters(filter_query_params)
+
+        filters = self.history_contents_filters.parse_query_filters_with_relations(filter_query_params, history_id)
 
         stats_requested = accept == HistoryContentsWithStatsResult.__accept_type__
         if stats_requested and self.history_contents_filters.contains_non_orm_filter(filters):
@@ -1412,7 +1413,7 @@ class HistoryItemOperator:
             return
         if isinstance(item, HistoryDatasetCollectionAssociation):
             return self.dataset_collection_manager.delete(trans, "history", item.id, recursive=True, purge=True)
-        self.hda_manager.purge(item, flush=self.flush)
+        self.hda_manager.purge(item, flush=True)
 
     def _change_datatype(
         self, item: HistoryItemModel, params: ChangeDatatypeOperationParams, trans: ProvidesHistoryContext

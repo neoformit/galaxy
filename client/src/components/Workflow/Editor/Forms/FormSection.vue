@@ -18,7 +18,7 @@
             v-for="(output, index) in outputs"
             :key="index"
             :output-name="output.name"
-            :active-outputs="nodeActiveOutputs"
+            :step="step"
             :inputs="nodeInputs"
             :datatypes="datatypes"
             :form-data="formData"
@@ -28,8 +28,8 @@
 </template>
 
 <script>
-import FormElement from "components/Form/FormElement";
-import FormOutput from "./FormOutput";
+import FormElement from "@/components/Form/FormElement";
+import FormOutput from "@/components/Workflow/Editor/Forms/FormOutput";
 
 export default {
     components: {
@@ -38,7 +38,7 @@ export default {
     },
     props: {
         id: {
-            type: String,
+            type: Number,
             required: true,
         },
         nodeInputs: {
@@ -49,7 +49,8 @@ export default {
             type: Array,
             required: true,
         },
-        nodeActiveOutputs: {
+        step: {
+            // type Step from @/stores/workflowStepStore
             type: Object,
             required: true,
         },

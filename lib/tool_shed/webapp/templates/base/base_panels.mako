@@ -19,9 +19,6 @@
 ## Default stylesheets
 <%def name="stylesheets()">
     <!--- base/base_panels.mako stylesheets() -->
-    ${h.css(
-        'bootstrap-tour',
-    )}
     ${h.dist_css(
         'base'
     )}
@@ -156,7 +153,7 @@
             <div id="background"></div>
 
             ## Layer iframes over backgrounds
-            <div id="masthead" class="navbar navbar-fixed-top navbar-inverse">
+            <div>
                 ${self.masthead()}
             </div>
 

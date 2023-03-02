@@ -23,6 +23,7 @@ from galaxy.model import (
 )
 from galaxy.model.dataset_collections.builder import CollectionBuilder
 from galaxy.model.none_like import NoneDataset
+from galaxy.objectstore import ObjectStorePopulator
 from galaxy.tools.parameters import update_dataset_ids
 from galaxy.tools.parameters.basic import (
     DataCollectionToolParameter,
@@ -367,6 +368,7 @@ class DefaultToolAction(ToolAction):
         collection_info=None,
         job_callback=None,
         flush_job=True,
+        skip=False,
     ):
         """
         Executes a tool, creating job and tool outputs, associating them, and
@@ -506,7 +508,7 @@ class DefaultToolAction(ToolAction):
                     )
             data.copy_tags_to(preserved_tags.values())
 
-            # This may not be neccesary with the new parent/child associations
+            # This may not be necessary with the new parent/child associations
             data.designation = name
             # Copy metadata from one of the inputs if requested.
 
@@ -638,6 +640,17 @@ class DefaultToolAction(ToolAction):
         job_setup_timer = ExecutionTimer()
         # Create the job object
         job, galaxy_session = self._new_job_for_session(trans, tool, history)
+        if skip:
+            job.state = job.states.SKIPPED
+            for output_collection in output_collections.out_collections.values():
+                output_collection.mark_as_populated()
+            object_store_populator = ObjectStorePopulator(trans.app, trans.user)
+            for data in out_data.values():
+                object_store_populator.set_object_store_id(data)
+                data.extension = "expression.json"
+                data.state = "ok"
+                with open(data.dataset.file_name, "w") as out:
+                    out.write(json.dumps(None))
         self._record_inputs(trans, tool, job, incoming, inp_data, inp_dataset_collections)
         self._record_outputs(job, out_data, output_collections)
         # execute immediate post job actions and associate post job actions that are to be executed after the job is complete
@@ -694,7 +707,7 @@ class DefaultToolAction(ToolAction):
                 trans.sa_session.flush()
                 log.info(f"Flushed transaction for job {job.log_str()} {job_flush_timer}")
 
-            return job, out_data, history
+        return job, out_data, history
 
     def _remap_job_on_rerun(self, trans, galaxy_session, rerun_remap_job_id, current_job, out_data):
         """
@@ -739,7 +752,7 @@ class DefaultToolAction(ToolAction):
                     current_job.parameters.append(p.copy())
             remapped_hdas = self.__remap_data_inputs(old_job=old_job, current_job=current_job)
             for jtod in old_job.output_datasets:
-                for (job_to_remap, jtid) in [(jtid.job, jtid) for jtid in jtod.dataset.dependent_jobs]:
+                for job_to_remap, jtid in [(jtid.job, jtid) for jtid in jtod.dataset.dependent_jobs]:
                     if (trans.user is not None and job_to_remap.user_id == trans.user.id) or (
                         trans.user is None and job_to_remap.session_id == galaxy_session.id
                     ):
@@ -825,7 +838,7 @@ class DefaultToolAction(ToolAction):
         #        parameters to the command as a special case.
         reductions: Dict[str, List[str]] = {}
         for name, dataset_collection_info_pairs in inp_dataset_collections.items():
-            for (dataset_collection, reduced) in dataset_collection_info_pairs:
+            for dataset_collection, reduced in dataset_collection_info_pairs:
                 if reduced:
                     if name not in reductions:
                         reductions[name] = []
@@ -1180,7 +1193,8 @@ def determine_output_format(
                             check, context=parameter_context, python_template_version=python_template_version
                         ) == when_elem.get("value", None):
                             ext = when_elem.get("format", ext)
-                    except Exception:  # bad tag input value; possibly referencing a param within a different conditional when block or other nonexistent grouping construct
+                    except Exception:
+                        # bad tag input value; possibly referencing a param within a different conditional when block or other nonexistent grouping construct
                         continue
                 else:
                     check = when_elem.get("input_dataset", None)

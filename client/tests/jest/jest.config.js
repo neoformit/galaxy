@@ -22,6 +22,7 @@ module.exports = {
     moduleFileExtensions: ["js", "ts", "json", "vue", "yml", "txt"],
     modulePaths: ["<rootDir>/src/", "<rootDir>/tests/", "<rootDir>/node_modules/", "./"],
     moduleNameMapper: {
+        "^d3(.*)$": "<rootDir>/node_modules/d3$1/dist/d3$1.min.js",
         "\\.(css|scss)$": "<rootDir>/tests/jest/__mocks__/style.js",
         "^@fontsource/.*": "<rootDir>/tests/jest/__mocks__/font.js",
         "^config$": "<rootDir>/tests/jest/__mocks__/config.js",
@@ -38,6 +39,7 @@ module.exports = {
     roots: ["<rootDir>/src/", "<rootDir>/tests/jest/standalone/"],
     setupFilesAfterEnv: ["<rootDir>/tests/jest/jest.setup.js"],
     testEnvironment: "jsdom",
+    testPathIgnorePatterns: ["/node_modules/", "/dist/"],
     transform: {
         "^.+\\.js$": "babel-jest",
         "^.*\\.(vue)$": "@vue/vue2-jest",

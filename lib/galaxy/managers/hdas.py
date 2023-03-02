@@ -337,6 +337,7 @@ class HDASerializer(  # datasets._UnflattenedMetadataDatasetAssociationSerialize
                 "hid",
                 "history_content_type",
                 "dataset_id",
+                "genome_build",
                 "state",
                 "extension",
                 "deleted",
@@ -482,7 +483,6 @@ class HDASerializer(  # datasets._UnflattenedMetadataDatasetAssociationSerialize
         hda = item
         display_apps: List[Dict[str, Any]] = []
         for display_app in hda.get_display_applications(trans).values():
-
             app_links = []
             for link_app in display_app.links.values():
                 app_links.append(

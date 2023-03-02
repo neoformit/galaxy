@@ -66,7 +66,7 @@ function onSetError(e) {
     errorText.value = e;
 }
 
-const { currentUser: user } = useCurrentUser();
+const { currentUser: user } = useCurrentUser(false, true);
 const hasUser = computed(() => !user.value.isAnonymous);
 
 const versions = computed(() => props.options.versions);
@@ -121,7 +121,7 @@ const showVersions = computed(() => props.options.versions?.length > 1);
 
             <ToolFooter
                 :id="props.id"
-                :has-citations="props.options.hasCitations"
+                :has-citations="props.options.citations"
                 :xrefs="props.options.xrefs"
                 :license="props.options.license"
                 :creators="props.options.creators"

@@ -39,13 +39,18 @@ from galaxy.job_execution import output_collect
 from galaxy.metadata import get_metadata_compute_strategy
 from galaxy.tool_shed.util.repository_util import get_installed_repository
 from galaxy.tool_shed.util.shed_util_common import set_image_paths
-from galaxy.tool_util.deps import CachedDependencyManager
+from galaxy.tool_util.deps import (
+    build_dependency_manager,
+    CachedDependencyManager,
+    NullDependencyManager,
+)
 from galaxy.tool_util.fetcher import ToolLocationFetcher
 from galaxy.tool_util.loader import (
     imported_macro_paths,
     raw_tool_xml_tree,
     template_macro_params,
 )
+from galaxy.tool_util.loader_directory import looks_like_a_tool
 from galaxy.tool_util.ontologies.ontology_data import (
     biotools_reference,
     expand_ontology_data,
@@ -67,8 +72,13 @@ from galaxy.tool_util.parser.xml import (
     XmlToolSource,
 )
 from galaxy.tool_util.provided_metadata import parse_tool_provided_metadata
-from galaxy.tool_util.toolbox import BaseGalaxyToolBox
+from galaxy.tool_util.toolbox import (
+    AbstractToolBox,
+    AbstractToolTagManager,
+    ToolSection,
+)
 from galaxy.tool_util.toolbox.views.sources import StaticToolBoxViewSources
+from galaxy.tool_util.verify.test_data import TestDataNotFoundError
 from galaxy.tools import expressions
 from galaxy.tools.actions import (
     DefaultToolAction,
@@ -314,9 +324,56 @@ def create_tool_from_representation(
     return create_tool_from_source(app, tool_source=tool_source, tool_dir=tool_dir)
 
 
-class ToolBox(BaseGalaxyToolBox):
-    """A derivative of AbstractToolBox with knowledge about Tool internals -
-    how to construct them, action types, dependency management, etc....
+class NullToolTagManager(AbstractToolTagManager):
+    def reset_tags(self):
+        return None
+
+    def handle_tags(self, tool_id, tool_definition_source):
+        return None
+
+
+class PersistentToolTagManager(AbstractToolTagManager):
+    def __init__(self, app):
+        self.app = app
+        self.sa_session = app.model.context
+
+    def reset_tags(self):
+        log.info(
+            f"removing all tool tag associations ({str(self.sa_session.query(self.app.model.ToolTagAssociation).count())})"
+        )
+        self.sa_session.query(self.app.model.ToolTagAssociation).delete()
+        self.sa_session.flush()
+
+    def handle_tags(self, tool_id, tool_definition_source):
+        elem = tool_definition_source
+        if self.app.config.get_bool("enable_tool_tags", False):
+            tag_names = elem.get("tags", "").split(",")
+            for tag_name in tag_names:
+                if tag_name == "":
+                    continue
+                tag = self.sa_session.query(self.app.model.Tag).filter_by(name=tag_name).first()
+                if not tag:
+                    tag = self.app.model.Tag(name=tag_name)
+                    self.sa_session.add(tag)
+                    self.sa_session.flush()
+                    tta = self.app.model.ToolTagAssociation(tool_id=tool_id, tag_id=tag.id)
+                    self.sa_session.add(tta)
+                    self.sa_session.flush()
+                else:
+                    for tagged_tool in tag.tagged_tools:
+                        if tagged_tool.tool_id == tool_id:
+                            break
+                    else:
+                        tta = self.app.model.ToolTagAssociation(tool_id=tool_id, tag_id=tag.id)
+                        self.sa_session.add(tta)
+                        self.sa_session.flush()
+
+
+class ToolBox(AbstractToolBox):
+    """
+    A derivative of AbstractToolBox with Galaxy tooling-specific functionality
+    and knowledge about Tool internals - how to construct them, action types,
+    dependency management, etc.
     """
 
     def __init__(self, config_filenames, tool_root_dir, app, save_integrated_tool_panel=True):
@@ -333,6 +390,7 @@ class ToolBox(BaseGalaxyToolBox):
             view_dicts=app.config.panel_views,
         )
         default_panel_view = app.config.default_panel_view
+
         super().__init__(
             config_filenames=config_filenames,
             tool_root_dir=tool_root_dir,
@@ -341,6 +399,40 @@ class ToolBox(BaseGalaxyToolBox):
             default_panel_view=default_panel_view,
             save_integrated_tool_panel=save_integrated_tool_panel,
         )
+
+        old_toolbox = getattr(app, "toolbox", None)
+        if old_toolbox:
+            self.dependency_manager = old_toolbox.dependency_manager
+        else:
+            self._init_dependency_manager()
+
+    def tool_tag_manager(self):
+        if hasattr(self.app.config, "get_bool") and self.app.config.get_bool("enable_tool_tags", False):
+            return PersistentToolTagManager(self.app)
+        else:
+            return NullToolTagManager()
+
+    @property
+    def sa_session(self):
+        """
+        Returns a SQLAlchemy session
+        """
+        return self.app.model.context
+
+    def reload_dependency_manager(self):
+        self._init_dependency_manager()
+
+    def load_builtin_converters(self):
+        id = "builtin_converters"
+        section = ToolSection({"name": "Built-in Converters", "id": id})
+        self._tool_panel[id] = section
+
+        converters = {
+            tool for target in self.app.datatypes_registry.datatype_converters.values() for tool in target.values()
+        }
+        for tool in converters:
+            tool.hidden = False
+            section.elems.append_tool(tool)
 
     def persist_cache(self, register_postfork=False):
         """
@@ -489,6 +581,34 @@ class ToolBox(BaseGalaxyToolBox):
             installed_changeset_revision=installed_changeset_revision,
             from_cache=True,
         )
+
+    def _looks_like_a_tool(self, path):
+        return looks_like_a_tool(path, enable_beta_formats=getattr(self.app.config, "enable_beta_tool_formats", False))
+
+    def _init_dependency_manager(self):
+        use_tool_dependency_resolution = getattr(self.app, "use_tool_dependency_resolution", True)
+        if not use_tool_dependency_resolution:
+            self.dependency_manager = NullDependencyManager()
+            return
+        app_config_dict = self.app.config.config_dict
+        conf_file = app_config_dict.get("dependency_resolvers_config_file")
+        default_tool_dependency_dir = os.path.join(
+            self.app.config.data_dir, self.app.config.schema.defaults["tool_dependency_dir"]
+        )
+        self.dependency_manager = build_dependency_manager(
+            app_config_dict=app_config_dict,
+            conf_file=conf_file,
+            default_tool_dependency_dir=default_tool_dependency_dir,
+        )
+
+    def _load_workflow(self, workflow_id):
+        """
+        Return an instance of 'Workflow' identified by `id`,
+        which is encoded in the tool panel.
+        """
+        id = self.app.security.decode_id(workflow_id)
+        stored = self.app.model.context.query(self.app.model.StoredWorkflow).get(id)
+        return stored.latest_workflow
 
     def __build_tool_version_select_field(self, tools, tool_id, set_selected):
         """Build a SelectField whose options are the ids for the received list of tools."""
@@ -1228,12 +1348,30 @@ class Tool(Dictifiable):
         if not test_data:
             # Fallback to Galaxy test data directory for builtin tools, tools
             # under development, and some older ToolShed published tools that
-            # used stock test data.
+            # used stock test data. Also possible remote test data using `location`.
             try:
-                test_data = self.app.test_data_resolver.get_filename(filename)
-            except ValueError:
+                test_data_context = self._find_test_data_context(filename)
+                test_data = self.app.test_data_resolver.get_filename(filename, test_data_context)
+            except TestDataNotFoundError:
                 test_data = None
         return test_data
+
+    def _find_test_data_context(self, filename: str):
+        """Returns the attributes (context) associated with a required file for test inputs or outputs."""
+        # We are returning the attributes of the first test input or output that matches the filename
+        # Could there be multiple different test data files with the same filename and different attributes?
+        # I hope not... otherwise we need a way to match a test file with its test definition.
+        for test in self.tests:
+            # Check for input context attributes
+            for required_file in test.required_files:
+                if len(required_file) > 1 and required_file[0] == filename:
+                    return required_file[1]
+            # Check for outputs context attributes too
+            for output in test.outputs:
+                value = output.get("value", None)
+                if value and value == filename:
+                    return output.get("attributes")
+        return None
 
     def __walk_test_data(self, dir, filename):
         for root, dirs, _ in os.walk(dir):
@@ -1461,7 +1599,7 @@ class Tool(Dictifiable):
                     # Must refresh when test_param changes
                     group_c.test_param.refresh_on_change = True
                     # And a set of possible cases
-                    for (value, case_inputs_source) in input_source.parse_when_input_sources():
+                    for value, case_inputs_source in input_source.parse_when_input_sources():
                         case = ConditionalWhen()
                         case.value = value
                         case.inputs = self.parse_input_elem(case_inputs_source, enctypes, context)
@@ -1899,6 +2037,7 @@ class Tool(Dictifiable):
         collection_info=None,
         job_callback=None,
         flush_job=True,
+        skip=False,
     ):
         """
         Return a pair with whether execution is successful as well as either
@@ -1916,6 +2055,7 @@ class Tool(Dictifiable):
                 collection_info=collection_info,
                 job_callback=job_callback,
                 flush_job=flush_job,
+                skip=skip,
             )
             job = rval[0]
             out_data = rval[1]
@@ -2806,7 +2946,6 @@ class ExpressionTool(Tool):
                 # Skip filtered outputs
                 continue
             if val.output_type == "data":
-
                 with open(out_data[key].file_name) as f:
                     src = json.load(f)
                 assert isinstance(src, dict), f"Expected dataset 'src' to be a dictionary - actual type is {type(src)}"
@@ -3056,7 +3195,15 @@ class DataManagerTool(OutputParameterJSONTool):
         assert (
             data_manager is not None
         ), f"Invalid data manager ({data_manager_id}) requested. It may have been removed before the job completed."
-        data_manager.process_result(out_data)
+        data_manager_mode = param_dict.get("__data_manager_mode", "populate")
+        if data_manager_mode == "populate":
+            data_manager.process_result(out_data)
+        elif data_manager_mode == "dry_run":
+            pass
+        elif data_manager_mode == "bundle":
+            data_manager.write_bundle(out_data)
+        else:
+            raise Exception("Unknown data manager mode encountered type...")
 
     def get_default_history_by_trans(self, trans, create=False):
         def _create_data_manager_history(user):
@@ -3450,7 +3597,7 @@ class SortTool(DatabaseOperationTool):
         sorttype = incoming["sort_type"]["sort_type"]
         new_elements = {}
         elements = hdca.collection.elements
-        presort_elements = []
+        presort_elements = None
         if sorttype == "alpha":
             presort_elements = [(dce.element_identifier, dce) for dce in elements]
         elif sorttype == "numeric":
@@ -3475,7 +3622,7 @@ class SortTool(DatabaseOperationTool):
         else:
             raise Exception(f"Unknown sort_type '{sorttype}'")
 
-        if presort_elements:
+        if presort_elements is not None:
             sorted_elements = [x[1] for x in sorted(presort_elements, key=lambda x: x[0])]
 
         for dce in sorted_elements:

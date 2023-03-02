@@ -33,6 +33,7 @@ from requests import Response
 from requests.cookies import RequestsCookieJar
 from typing_extensions import (
     Literal,
+    NotRequired,
     Protocol,
     TypedDict,
 )
@@ -85,43 +86,39 @@ class OutputsDict(dict):
 
 JobDataT = Dict[str, Any]
 JobDataCallbackT = Callable[[JobDataT], None]
-ValidToolTestDict = TypedDict(
-    "ValidToolTestDict",
-    {
-        "inputs": Any,
-        "outputs": Any,
-        "output_collections": List[Dict[str, Any]],
-        "stdout": AssertionList,
-        "stderr": AssertionList,
-        "expect_exit_code": Optional[int],
-        "expect_failure": bool,
-        "expect_test_failure": bool,
-        "maxseconds": Optional[int],
-        "num_outputs": Optional[int],
-        "command_line": AssertionList,
-        "command_version": AssertionList,
-        "required_files": List[Any],
-        "required_data_tables": List[Any],
-        "required_loc_files": List[str],
-        "error": Literal[False],
-        "tool_id": str,
-        "tool_version": str,
-        "test_index": int,
-    },
-)
 
-InvalidToolTestDict = TypedDict(
-    "InvalidToolTestDict",
-    {
-        "error": Literal[True],
-        "tool_id": str,
-        "tool_version": str,
-        "test_index": int,
-        "inputs": Any,
-        "exception": str,
-        "maxseconds": Optional[int],
-    },
-)
+
+class ValidToolTestDict(TypedDict):
+    inputs: Any
+    outputs: Any
+    output_collections: List[Dict[str, Any]]
+    stdout: NotRequired[AssertionList]
+    stderr: NotRequired[AssertionList]
+    expect_exit_code: NotRequired[int]
+    expect_failure: NotRequired[bool]
+    expect_test_failure: NotRequired[bool]
+    maxseconds: NotRequired[int]
+    num_outputs: NotRequired[int]
+    command_line: NotRequired[AssertionList]
+    command_version: NotRequired[AssertionList]
+    required_files: NotRequired[List[Any]]
+    required_data_tables: NotRequired[List[Any]]
+    required_loc_files: NotRequired[List[str]]
+    error: Literal[False]
+    tool_id: str
+    tool_version: str
+    test_index: int
+
+
+class InvalidToolTestDict(TypedDict):
+    error: Literal[True]
+    tool_id: str
+    tool_version: str
+    test_index: int
+    inputs: Any
+    exception: str
+    maxseconds: Optional[int]
+
 
 ToolTestDict = Union[ValidToolTestDict, InvalidToolTestDict]
 ToolTestDictsT = List[ToolTestDict]
@@ -448,7 +445,10 @@ class GalaxyInteractorApi:
     def test_data_path(self, tool_id, filename, tool_version=None):
         version_fragment = f"&tool_version={tool_version}" if tool_version else ""
         response = self._get(f"tools/{tool_id}/test_data_path?filename={filename}{version_fragment}", admin=True)
-        return response.json()
+        result = response.json()
+        if response.status_code in [200, 404]:
+            return result
+        raise Exception(result["err_msg"])
 
     def test_data_download(self, tool_id, filename, mode="file", is_output=True, tool_version=None):
         result = None
@@ -712,7 +712,6 @@ class GalaxyInteractorApi:
             return
 
         for history_content in history_contents:
-
             dataset = history_content
 
             print(ERROR_MESSAGE_DATASET_SEP)
@@ -1598,15 +1597,21 @@ class ToolTestDescription:
     doing dynamic tests in this way allows better integration)
     """
 
-    def __init__(self, processed_test_dict):
+    def __init__(self, processed_test_dict: ToolTestDict):
         assert (
             "test_index" in processed_test_dict
         ), "Invalid processed test description, must have a 'test_index' for naming, etc.."
         test_index = processed_test_dict["test_index"]
         name = processed_test_dict.get("name", f"Test-{test_index + 1}")
-        maxseconds = processed_test_dict.get("maxseconds", DEFAULT_TOOL_TEST_WAIT)
-        if maxseconds is not None:
-            maxseconds = int(maxseconds)
+        error_in_test_definition = processed_test_dict["error"]
+        if not error_in_test_definition:
+            processed_test_dict = cast(ValidToolTestDict, processed_test_dict)
+            maxseconds = int(processed_test_dict.get("maxseconds") or DEFAULT_TOOL_TEST_WAIT or 86400)
+            output_collections = processed_test_dict.get("output_collections", [])
+        else:
+            processed_test_dict = cast(InvalidToolTestDict, processed_test_dict)
+            maxseconds = DEFAULT_TOOL_TEST_WAIT
+            output_collections = []
 
         self.test_index = test_index
         assert (
@@ -1635,9 +1640,7 @@ class ToolTestDescription:
         self.error = processed_test_dict.get("error", False)
         self.exception = processed_test_dict.get("exception", None)
 
-        self.output_collections = [
-            TestCollectionOutputDef.from_dict(d) for d in processed_test_dict.get("output_collections", [])
-        ]
+        self.output_collections = [TestCollectionOutputDef.from_dict(d) for d in output_collections]
         self.command_line = processed_test_dict.get("command_line", None)
         self.command_version = processed_test_dict.get("command_version", None)
         self.stdout = processed_test_dict.get("stdout", None)
@@ -1692,6 +1695,8 @@ def test_data_iter(required_files):
             composite_data=extra.get("composite_data", []),
             ftype=extra.get("ftype", DEFAULT_FTYPE),
             dbkey=extra.get("dbkey", DEFAULT_DBKEY),
+            location=extra.get("location", None),
+            md5=extra.get("md5", None),
         )
         edit_attributes = extra.get("edit_attributes", [])
 

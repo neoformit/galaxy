@@ -224,6 +224,9 @@ class ConditionalDependencies:
     def check_python_ldap(self):
         return "ldap" in self.authenticators or "activedirectory" in self.authenticators
 
+    def check_ldap3(self):
+        return "ldap3" in self.authenticators
+
     def check_python_pam(self):
         return "PAM" in self.authenticators
 
@@ -242,20 +245,12 @@ class ConditionalDependencies:
     def check_fs_webdavfs(self):
         return "webdav" in self.file_sources
 
-    def check_fs_s3fs(self):
-        # pyfilesystem plugin access to s3
-        return "s3" in self.file_sources
-
     def check_fs_anvilfs(self):
         # pyfilesystem plugin access to terra on anvil
         return "anvil" in self.file_sources
 
     def check_fs_sshfs(self):
         return "ssh" in self.file_sources
-
-    def check_s3fs(self):
-        # use s3fs directly (skipping pyfilesystem) for direct access to more options
-        return "s3fs" in self.file_sources
 
     def check_fs_googledrivefs(self):
         return "googledrive" in self.file_sources

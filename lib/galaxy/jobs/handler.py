@@ -173,26 +173,25 @@ class ItemGrabber:
         # https://blog.2ndquadrant.com/what-is-select-skip-locked-for-in-postgresql-9-5/
         if self._grab_query is None:
             self.setup_query()
-        self.sa_session.expunge_all()
-        conn = self.sa_session.connection(execution_options=self._grab_conn_opts)
-        with conn.begin() as trans:
-            try:
-                proxy = conn.execute(self._grab_query)
-                if self._supports_returning:
-                    rows = proxy.fetchall()
-                    if rows:
-                        log.debug(f"Grabbed {self.grab_type}(s): {', '.join(str(row[0]) for row in rows)}")
-                        trans.commit()
-                    else:
-                        trans.rollback()
-                else:
-                    trans.commit()
-            except OperationalError as e:
-                # If this is a serialization failure on PostgreSQL, then e.orig is a psycopg2 TransactionRollbackError
-                # and should have attribute `code`. Other engines should just report the message and move on.
-                if int(getattr(e.orig, "pgcode", -1)) != 40001:
-                    log.debug("Grabbing %s failed (serialization failures are ok): %s", self.grab_type, unicodify(e))
-                trans.rollback()
+
+        with self.app.model.engine.connect() as conn:
+            with conn.begin() as trans:
+                try:
+                    proxy = conn.execute(self._grab_query)
+                    if self._supports_returning:
+                        rows = proxy.fetchall()
+                        if rows:
+                            log.debug(f"Grabbed {self.grab_type}(s): {', '.join(str(row[0]) for row in rows)}")
+                        else:
+                            trans.rollback()
+                except OperationalError as e:
+                    # If this is a serialization failure on PostgreSQL, then e.orig is a psycopg2 TransactionRollbackError
+                    # and should have attribute `code`. Other engines should just report the message and move on.
+                    if int(getattr(e.orig, "pgcode", -1)) != 40001:
+                        log.debug(
+                            "Grabbing %s failed (serialization failures are ok): %s", self.grab_type, unicodify(e)
+                        )
+                    trans.rollback()
 
 
 class JobHandlerQueue(Monitors):
@@ -264,75 +263,67 @@ class JobHandlerQueue(Monitors):
         job handler starts.
         In case the activation is enforced it will filter out the jobs of inactive users.
         """
-        jobs_at_startup = []
+        stmt = self._build_check_jobs_at_startup_statement()
+        with self.sa_session() as session, session.begin():
+            jobs_at_startup = session.scalars(stmt)
+            for job in jobs_at_startup:
+                if not self.app.toolbox.has_tool(job.tool_id, job.tool_version, exact=True):
+                    log.warning(f"({job.id}) Tool '{job.tool_id}' removed from tool config, unable to recover job")
+                    self.job_wrapper(job).fail(
+                        "This tool was disabled before the job completed.  Please contact your Galaxy administrator."
+                    )
+                elif job.job_runner_name is not None and job.job_runner_external_id is None:
+                    # This could happen during certain revisions of Galaxy where a runner URL was persisted before the job was dispatched to a runner.
+                    log.debug(
+                        f"({job.id}) Job runner assigned but no external ID recorded, adding to the job handler queue"
+                    )
+                    job.job_runner_name = None
+                    if self.track_jobs_in_database:
+                        job.set_state(model.Job.states.NEW)
+                    else:
+                        self.queue.put((job.id, job.tool_id))
+                elif (
+                    job.job_runner_name is not None
+                    and job.job_runner_external_id is not None
+                    and job.destination_id is None
+                ):
+                    # This is the first start after upgrading from URLs to destinations, convert the URL to a destination and persist
+                    job_wrapper = self.job_wrapper(job)
+                    job_destination = self.dispatcher.url_to_destination(job.job_runner_name)
+                    if job_destination.id is None:
+                        job_destination.id = "legacy_url"
+                    job_wrapper.set_job_destination(job_destination, job.job_runner_external_id)
+                    self.dispatcher.recover(job, job_wrapper)
+                    log.info(f"({job.id}) Converted job from a URL to a destination and recovered")
+                elif job.job_runner_name is None:
+                    # Never (fully) dispatched
+                    log.debug(
+                        f"({job.id}) No job runner assigned and job still in '{job.state}' state, adding to the job handler queue"
+                    )
+                    if self.track_jobs_in_database:
+                        job.set_state(model.Job.states.NEW)
+                    else:
+                        self.queue.put((job.id, job.tool_id))
+                else:
+                    # Already dispatched and running
+                    job_wrapper = self.__recover_job_wrapper(job)
+                    self.dispatcher.recover(job, job_wrapper)
+
+    def _build_check_jobs_at_startup_statement(self):
         if self.track_jobs_in_database:
             in_list = (model.Job.states.QUEUED, model.Job.states.RUNNING, model.Job.states.STOPPED)
         else:
             in_list = (model.Job.states.NEW, model.Job.states.QUEUED, model.Job.states.RUNNING)
-        if self.app.config.user_activation_on:
-            jobs_at_startup = (
-                self.sa_session.query(model.Job)
-                .enable_eagerloads(False)
-                .outerjoin(model.User)
-                .filter(
-                    model.Job.state.in_(in_list)
-                    & (model.Job.handler == self.app.config.server_name)
-                    & or_((model.Job.user_id == null()), (model.User.active == true()))
-                )
-                .yield_per(model.YIELD_PER_ROWS)
-            )
-        else:
-            jobs_at_startup = (
-                self.sa_session.query(model.Job)
-                .enable_eagerloads(False)
-                .filter(model.Job.state.in_(in_list) & (model.Job.handler == self.app.config.server_name))
-                .yield_per(model.YIELD_PER_ROWS)
-            )
 
-        for job in jobs_at_startup:
-            if not self.app.toolbox.has_tool(job.tool_id, job.tool_version, exact=True):
-                log.warning(f"({job.id}) Tool '{job.tool_id}' removed from tool config, unable to recover job")
-                self.job_wrapper(job).fail(
-                    "This tool was disabled before the job completed.  Please contact your Galaxy administrator."
-                )
-            elif job.job_runner_name is not None and job.job_runner_external_id is None:
-                # This could happen during certain revisions of Galaxy where a runner URL was persisted before the job was dispatched to a runner.
-                log.debug(
-                    f"({job.id}) Job runner assigned but no external ID recorded, adding to the job handler queue"
-                )
-                job.job_runner_name = None
-                if self.track_jobs_in_database:
-                    job.set_state(model.Job.states.NEW)
-                else:
-                    self.queue.put((job.id, job.tool_id))
-            elif (
-                job.job_runner_name is not None
-                and job.job_runner_external_id is not None
-                and job.destination_id is None
-            ):
-                # This is the first start after upgrading from URLs to destinations, convert the URL to a destination and persist
-                job_wrapper = self.job_wrapper(job)
-                job_destination = self.dispatcher.url_to_destination(job.job_runner_name)
-                if job_destination.id is None:
-                    job_destination.id = "legacy_url"
-                job_wrapper.set_job_destination(job_destination, job.job_runner_external_id)
-                self.dispatcher.recover(job, job_wrapper)
-                log.info(f"({job.id}) Converted job from a URL to a destination and recovered")
-            elif job.job_runner_name is None:
-                # Never (fully) dispatched
-                log.debug(
-                    f"({job.id}) No job runner assigned and job still in '{job.state}' state, adding to the job handler queue"
-                )
-                if self.track_jobs_in_database:
-                    job.set_state(model.Job.states.NEW)
-                else:
-                    self.queue.put((job.id, job.tool_id))
-            else:
-                # Already dispatched and running
-                job_wrapper = self.__recover_job_wrapper(job)
-                self.dispatcher.recover(job, job_wrapper)
-        if self.sa_session.dirty:
-            self.sa_session.flush()
+        stmt = (
+            select(model.Job)
+            .execution_options(yield_per=model.YIELD_PER_ROWS)
+            .filter(model.Job.state.in_(in_list) & (model.Job.handler == self.app.config.server_name))
+        )
+        if self.app.config.user_activation_on:
+            # Filter out the jobs of inactive users.
+            stmt = stmt.outerjoin(model.User).filter(or_((model.Job.user_id == null()), (model.User.active == true())))
+        return stmt
 
     def __recover_job_wrapper(self, job):
         # Already dispatched and running
@@ -613,7 +604,7 @@ class JobHandlerQueue(Monitors):
         jobs_to_pause = defaultdict(list)
         jobs_to_fail = defaultdict(list)
         jobs_to_ignore = defaultdict(list)
-        for (job_id, hda_deleted, hda_state, hda_name, dataset_deleted, dataset_purged, dataset_state) in queries:
+        for job_id, hda_deleted, hda_state, hda_name, dataset_deleted, dataset_purged, dataset_state in queries:
             if hda_deleted or dataset_deleted:
                 if dataset_purged:
                     # If the dataset has been purged we can't resume the job by undeleting the input

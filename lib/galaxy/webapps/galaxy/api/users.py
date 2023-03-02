@@ -7,6 +7,7 @@ import logging
 import re
 
 from fastapi import (
+    Body,
     Path,
     Response,
     status,
@@ -35,6 +36,7 @@ from galaxy.model import (
 )
 from galaxy.schema import APIKeyModel
 from galaxy.schema.fields import DecodedDatabaseIdField
+from galaxy.schema.schema import UserBeaconSetting
 from galaxy.security.validate_user_input import (
     validate_email,
     validate_password,
@@ -74,7 +76,7 @@ APIKeyPathParam: str = Path(..., title="API Key", description="The API key of th
 
 
 @router.cbv
-class FastAPIHistories:
+class FastAPIUsers:
     service: UsersService = depends(UsersService)
 
     @router.put(
@@ -137,6 +139,44 @@ class FastAPIHistories:
     ):
         self.service.delete_api_key(trans, user_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    @router.get(
+        "/api/users/{user_id}/beacon",
+        summary="Returns information about beacon share settings",
+    )
+    def get_beacon(
+        self,
+        trans: ProvidesUserContext = DependsOnTrans,
+        user_id: DecodedDatabaseIdField = UserIdPathParam,
+    ) -> UserBeaconSetting:
+        """
+        **Warning**: This endpoint is experimental and might change or disappear in future versions.
+        """
+        user = self.service._get_user(trans, user_id)
+
+        enabled = user.preferences["beacon_enabled"] if "beacon_enabled" in user.preferences else False
+
+        return UserBeaconSetting(enabled=enabled)
+
+    @router.post(
+        "/api/users/{user_id}/beacon",
+        summary="Changes beacon setting",
+    )
+    def set_beacon(
+        self,
+        trans: ProvidesUserContext = DependsOnTrans,
+        user_id: DecodedDatabaseIdField = UserIdPathParam,
+        payload: UserBeaconSetting = Body(...),
+    ) -> UserBeaconSetting:
+        """
+        **Warning**: This endpoint is experimental and might change or disappear in future versions.
+        """
+        user = self.service._get_user(trans, user_id)
+
+        user.preferences["beacon_enabled"] = payload.enabled
+        trans.sa_session.flush()
+
+        return payload
 
 
 class UserAPIController(BaseGalaxyAPIController, UsesTagsMixin, BaseUIController, UsesFormDefinitionsMixin):
@@ -471,7 +511,7 @@ class UserAPIController(BaseGalaxyAPIController, UsesTagsMixin, BaseUIController
                         "type": "text",
                         "label": "Public name",
                         "value": username,
-                        "help": 'Your public name is an identifier that will be used to generate addresses for information you share publicly. Public names must be at least three characters in length and contain only lower-case letters, numbers, and the "-" character.',
+                        "help": 'Your public name is an identifier that will be used to generate addresses for information you share publicly. Public names must be at least three characters in length and contain only lower-case letters, numbers, dots, underscores, and dashes (".", "_", "-").',
                     }
                 )
             info_form_models = self.get_all_forms(
@@ -547,7 +587,7 @@ class UserAPIController(BaseGalaxyAPIController, UsesTagsMixin, BaseUIController
                         label="Public name:",
                         type="text",
                         value=username,
-                        help='Your public name provides a means of identifying you publicly within this tool shed. Public names must be at least three characters in length and contain only lower-case letters, numbers, and the "-" character. You cannot change your public name after you have created a repository in this tool shed.',
+                        help='Your public name provides a means of identifying you publicly within this tool shed. Public names must be at least three characters in length and contain only lower-case letters, numbers, dots, underscores, and dashes (".", "_", "-"). You cannot change your public name after you have created a repository in this tool shed.',
                     )
                 )
         user_info["inputs"] = inputs
@@ -746,6 +786,22 @@ class UserAPIController(BaseGalaxyAPIController, UsesTagsMixin, BaseUIController
             raise exceptions.ObjectAttributeInvalidException(
                 f"This type is not supported. Given object_type: {object_type}"
             )
+
+    @expose_api
+    def set_theme(self, trans, id: str, theme: str, payload=None, **kwd) -> str:
+        """Sets the user's theme choice.
+        PUT /api/users/{id}/theme/{theme}
+
+        :param id: the encoded id of the user
+        :type  id: str
+        :param theme: the theme identifier/name that the user has selected as preference
+        :type  theme: str
+        """
+        payload = payload or {}
+        user = self._get_user(trans, id)
+        user.preferences["theme"] = theme
+        trans.sa_session.flush()
+        return theme
 
     @expose_api
     def get_password(self, trans, id, payload=None, **kwd):

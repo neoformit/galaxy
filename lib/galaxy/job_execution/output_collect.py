@@ -189,7 +189,6 @@ def collect_dynamic_outputs(
 
 
 class BaseJobContext(ModelPersistenceContext):
-
     max_discovered_files: Union[int, float]
     tool_provided_metadata: BaseToolProvidedMetadata
     job_working_directory: str
@@ -575,7 +574,7 @@ def discover_files(output_name, tool_provided_metadata, extra_file_collectors, j
                 JsonCollectedDatasetMatch(dataset, extra_file_collector, filename, path=path),
             )
     else:
-        for (match, collector) in walk_over_file_collectors(extra_file_collectors, job_working_directory, matchable):
+        for match, collector in walk_over_file_collectors(extra_file_collectors, job_working_directory, matchable):
             yield DiscoveredFile(match.path, collector, match)
 
 
@@ -614,10 +613,9 @@ def walk_over_extra_files(target_dir, extra_file_collector, job_working_director
                     if match:
                         yield match
 
-    for match in extra_file_collector.sort(
+    yield from extra_file_collector.sort(
         _walk(target_dir, extra_file_collector, job_working_directory, matchable, parent_paths)
-    ):
-        yield match
+    )
 
 
 def dataset_collector(dataset_collection_description):

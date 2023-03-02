@@ -10,12 +10,6 @@
                     <div v-if="showEntryPoints">
                         <ToolEntryPoints v-for="job in entryPoints" :key="job.id" :job-id="job.id" />
                     </div>
-                    <ToolSuccess
-                        v-if="showSuccess"
-                        :job-def="jobDef"
-                        :job-response="jobResponse"
-                        :tool-name="toolName" />
-                    <Webhook v-if="showSuccess" type="tool" :tool-id="jobDef.tool_id" />
                     <b-modal v-model="showError" size="sm" :title="errorTitle | l" scrollable ok-only>
                         <b-alert v-if="errorMessage" show variant="danger">
                             {{ errorMessage }}
@@ -108,7 +102,9 @@
 <script>
 import { getGalaxyInstance } from "app";
 import { useHistoryItemsStore } from "stores/history/historyItemsStore";
-import { mapState } from "pinia";
+import { useJobStore } from "stores/jobStore";
+import { mapState, mapActions } from "pinia";
+import { mapGetters } from "vuex";
 import { getToolFormData, updateToolFormData, submitJob } from "./services";
 import { allowCachedJobs } from "./utilities";
 import { refreshContentsWrapper } from "utils/data";
@@ -120,10 +116,8 @@ import LoadingSpan from "components/LoadingSpan";
 import FormDisplay from "components/Form/FormDisplay";
 import FormElement from "components/Form/FormElement";
 import ToolEntryPoints from "components/ToolEntryPoints/ToolEntryPoints";
-import ToolSuccess from "./ToolSuccess";
 import ToolRecommendation from "../ToolRecommendation";
 import UserHistories from "components/providers/UserHistories";
-import Webhook from "components/Common/Webhook";
 import Heading from "components/Common/Heading";
 
 export default {
@@ -136,10 +130,8 @@ export default {
         ToolCard,
         FormElement,
         ToolEntryPoints,
-        ToolSuccess,
         ToolRecommendation,
         UserHistories,
-        Webhook,
         Heading,
     },
     props: {
@@ -163,11 +155,11 @@ export default {
     data() {
         return {
             disabled: false,
+            initialized: false,
             showLoading: true,
             showForm: false,
             showEntryPoints: false,
             showRecommendation: false,
-            showSuccess: false,
             showError: false,
             showExecuting: false,
             formConfig: {},
@@ -191,7 +183,8 @@ export default {
         };
     },
     computed: {
-        ...mapState(useHistoryItemsStore, ["getLatestCreateTime"]),
+        ...mapState(useHistoryItemsStore, ["getLastUpdateTime"]),
+        ...mapGetters("history", ["currentHistoryId"]),
         toolName() {
             return this.formConfig.name;
         },
@@ -223,20 +216,21 @@ export default {
         },
     },
     watch: {
-        getLatestCreateTime() {
-            const Galaxy = getGalaxyInstance();
-            if (Galaxy && Galaxy.currHistoryPanel) {
-                console.debug("History change watcher detected a change.");
-                this.onHistoryChange();
-            }
+        currentHistoryId() {
+            this.onHistoryChange();
+        },
+        getLastUpdateTime() {
+            this.onHistoryChange();
         },
     },
     created() {
         this.requestTool().then(() => {
+            this.initialized = true;
             console.debug(`ToolForm::created - Started listening to history changes. [${this.id}]`);
         });
     },
     methods: {
+        ...mapActions(useJobStore, ["saveLatestResponse"]),
         emailAllowed(config, user) {
             return config.server_mail_configured && !user.isAnonymous;
         },
@@ -244,8 +238,11 @@ export default {
             return allowCachedJobs(user.preferences);
         },
         onHistoryChange() {
-            console.debug(`ToolForm::created - Loading history changes. [${this.id}]`);
-            this.onUpdate();
+            const Galaxy = getGalaxyInstance();
+            if (this.initialized && Galaxy && Galaxy.currHistoryPanel) {
+                console.debug(`ToolForm::onHistoryChange - Loading history changes. [${this.id}]`);
+                this.onUpdate();
+            }
         },
         onValidation(validationInternal) {
             this.validationInternal = validationInternal;
@@ -330,9 +327,15 @@ export default {
                     const nJobs = jobResponse && jobResponse.jobs ? jobResponse.jobs.length : 0;
                     if (nJobs > 0) {
                         this.showForm = false;
-                        this.showSuccess = true;
                         this.jobDef = jobDef;
                         this.jobResponse = jobResponse;
+                        const response = {
+                            jobDef: this.jobDef,
+                            jobResponse: this.jobResponse,
+                            toolName: this.toolName,
+                        };
+                        this.saveLatestResponse(response);
+                        this.$router.push(`/jobs/submission/success`);
                     } else {
                         this.showError = true;
                         this.showForm = true;

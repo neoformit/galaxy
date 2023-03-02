@@ -23,29 +23,34 @@ from .util import _parse_name
 
 NOT_IMPLEMENTED_MESSAGE = "Galaxy tool format does not yet support this tool feature."
 
-AssertionDict = TypedDict(
-    "AssertionDict", {"tag": str, "attributes": Dict[str, Any], "children": Optional[List[Dict[str, Any]]]}
-)
+
+class AssertionDict(TypedDict):
+    tag: str
+    attributes: Dict[str, Any]
+    children: Optional[List[Dict[str, Any]]]
+
+
 AssertionList = Optional[List[AssertionDict]]
 XmlInt = Union[str, int]
-ToolSourceTest = TypedDict(
-    "ToolSourceTest",
-    {
-        "inputs": Any,
-        "outputs": Any,
-        "output_collections": List[Any],
-        "stdout": AssertionList,
-        "stderr": AssertionList,
-        "expect_exit_code": Optional[XmlInt],
-        "expect_failure": bool,
-        "expect_test_failure": bool,
-        "maxseconds": Optional[XmlInt],
-        "expect_num_outputs": Optional[XmlInt],
-        "command": AssertionList,
-        "command_version": AssertionList,
-    },
-)
-ToolSourceTests = TypedDict("ToolSourceTests", {"tests": List[ToolSourceTest]})
+
+
+class ToolSourceTest(TypedDict):
+    inputs: Any
+    outputs: Any
+    output_collections: List[Any]
+    stdout: AssertionList
+    stderr: AssertionList
+    expect_exit_code: Optional[XmlInt]
+    expect_failure: bool
+    expect_test_failure: bool
+    maxseconds: Optional[XmlInt]
+    expect_num_outputs: Optional[XmlInt]
+    command: AssertionList
+    command_version: AssertionList
+
+
+class ToolSourceTests(TypedDict):
+    tests: List[ToolSourceTest]
 
 
 class ToolSource(metaclass=ABCMeta):
@@ -539,7 +544,7 @@ class RequiredFiles:
             excludes.append({"path": ".hg", "path_type": "prefix"})
 
         files: List[str] = []
-        for (dirpath, _, filenames) in safe_walk(tool_directory):
+        for dirpath, _, filenames in safe_walk(tool_directory):
             for filename in filenames:
                 rel_path = join(dirpath, filename).replace(tool_directory + os.path.sep, "")
                 if matches(self.includes, rel_path) and not matches(self.excludes, rel_path):

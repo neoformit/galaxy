@@ -7,6 +7,7 @@ from io import BytesIO
 from typing import (
     Any,
     Dict,
+    List,
 )
 
 import pytest
@@ -15,6 +16,7 @@ from requests import (
     put,
 )
 
+from galaxy.tool_util.verify.interactor import ValidToolTestDict
 from galaxy.util import galaxy_root_path
 from galaxy.util.unittest_utils import skip_if_github_down
 from galaxy_test.base import rules_test_data
@@ -817,6 +819,23 @@ class TestToolsApi(ApiTestCase, TestsTools):
     def test_apply_rules_6(self):
         self._apply_rules_and_check(rules_test_data.EXAMPLE_6)
 
+    @skip_without_tool("galaxy_json_sleep")
+    def test_dataset_hidden_after_job_finish(self):
+        with self.dataset_populator.test_history() as history_id:
+            inputs = {
+                "sleep_time": 5,
+            }
+            response = self._run("galaxy_json_sleep", history_id, inputs, assert_ok=True)
+            output = response["outputs"][0]
+            response = self._put(
+                f"histories/{history_id}/contents/datasets/{output['id']}", data={"visible": False}, json=True
+            )
+            response.raise_for_status()
+            output_details = self.dataset_populator.get_history_dataset_details(history_id, dataset=output, wait=False)
+            assert not output_details["visible"]
+            output_details = self.dataset_populator.get_history_dataset_details(history_id, dataset=output, wait=True)
+            assert not output_details["visible"]
+
     @skip_without_tool("multi_select")
     def test_multi_select_as_list(self):
         with self.dataset_populator.test_history(require_new=False) as history_id:
@@ -957,7 +976,7 @@ class TestToolsApi(ApiTestCase, TestsTools):
         assert tool_info["version"] == "0.2"
 
     @skip_without_tool("cat1")
-    def test_run_cat1_single_meta_wrapper(self, history_id):
+    def test_run_cat1_single_meta_wrapper(self):
         with self.dataset_populator.test_history_for(self.test_run_cat1_single_meta_wrapper) as history_id:
             # Wrap input in a no-op meta parameter wrapper like Sam is planning to
             # use for all UI API submissions.
@@ -1449,16 +1468,17 @@ class TestToolsApi(ApiTestCase, TestsTools):
         def register_job_data(job_data):
             job_data_list.append(job_data)
 
-        def tool_test_case_list(inputs, required_files):
+        def tool_test_case_list(inputs, required_files) -> List[ValidToolTestDict]:
             return [
                 {
                     "inputs": inputs,
                     "outputs": {},
                     "required_files": required_files,
-                    "name": "dbkey_output_action-0",
+                    "output_collections": [],
                     "test_index": 0,
                     "tool_version": "0.1.0",
                     "tool_id": "dbkey_output_action",
+                    "error": False,
                 }
             ]
 
@@ -2191,7 +2211,7 @@ class TestToolsApi(ApiTestCase, TestsTools):
             (element10, "456\n789\n"),
             (element11, "456\n0ab\n"),
         ]
-        for (element, expected_contents) in expected_contents_list:
+        for element, expected_contents in expected_contents_list:
             dataset_id = element["object"]["id"]
             contents = self.dataset_populator.get_history_dataset_content(history_id, dataset_id=dataset_id)
             assert expected_contents == contents

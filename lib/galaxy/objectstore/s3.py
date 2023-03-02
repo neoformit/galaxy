@@ -32,11 +32,11 @@ from galaxy.util import (
 )
 from galaxy.util.path import safe_relpath
 from galaxy.util.sleeper import Sleeper
-from .s3_multipart_upload import multipart_upload
-from ..objectstore import (
+from . import (
     ConcreteObjectStore,
     convert_bytes,
 )
+from .s3_multipart_upload import multipart_upload
 
 NO_BOTO_ERROR_MESSAGE = (
     "S3/Swift object store configured, but no boto dependency available."
@@ -593,7 +593,6 @@ class S3ObjectStore(ConcreteObjectStore, CloudConfigMixin):
 
     def _create(self, obj, **kwargs):
         if not self._exists(obj, **kwargs):
-
             # Pull out locally used fields
             extra_dir = kwargs.get("extra_dir", None)
             extra_dir_at_root = kwargs.get("extra_dir_at_root", False)

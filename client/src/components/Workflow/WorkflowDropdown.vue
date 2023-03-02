@@ -1,22 +1,21 @@
 <template>
     <div>
         <b-link
+            v-b-tooltip.hover
             class="workflow-dropdown font-weight-bold"
             data-toggle="dropdown"
+            :title="getWorkflowTooltip(sourceType, workflow)"
             aria-haspopup="true"
             aria-expanded="false">
             <font-awesome-icon icon="caret-down" />
             <span class="workflow-dropdown-name">{{ workflow.name }}</span>
+            <span v-if="sourceType.includes('trs')">
+                <font-awesome-icon icon="check" class="workflow-trs-icon" />
+            </span>
+            <span v-if="sourceType == 'url'">
+                <font-awesome-icon class="workflow-external-link" icon="link" />
+            </span>
         </b-link>
-        <span
-            v-if="sourceType.includes('trs')"
-            v-b-tooltip.hover
-            :title="`Imported from TRS ID (version ${workflow.source_metadata.trs_version_id})`">
-            <font-awesome-icon icon="check" class="workflow-trs-icon" />
-        </span>
-        <span v-if="sourceType == 'url'" v-b-tooltip.hover :title="`Imported from ${workflow.source_metadata.url}`">
-            <font-awesome-icon class="workflow-external-link" icon="link" />
-        </span>
         <p v-if="workflow.description" class="workflow-dropdown-description">{{ workflow.description }}</p>
         <div class="dropdown-menu" aria-labelledby="workflow-dropdown">
             <a
@@ -80,7 +79,7 @@
 </template>
 <script>
 import { Services } from "./services";
-import { safePath } from "utils/redirect";
+import { withPrefix } from "utils/redirect";
 
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { library } from "@fortawesome/fontawesome-svg-core";
@@ -98,22 +97,22 @@ export default {
             return `/workflows/edit?id=${this.workflow.id}`;
         },
         urlDownload() {
-            return safePath(`/api/workflows/${this.workflow.id}/download?format=json-download`);
+            return withPrefix(`/api/workflows/${this.workflow.id}/download?format=json-download`);
         },
         urlShare() {
             return `/workflows/sharing?id=${this.workflow.id}`;
         },
         urlExport() {
-            return safePath(`/workflows/export?id=${this.workflow.id}`);
+            return withPrefix(`/workflows/export?id=${this.workflow.id}`);
         },
         urlView() {
-            return safePath(`/published/workflow?id=${this.workflow.id}`);
+            return withPrefix(`/published/workflow?id=${this.workflow.id}`);
         },
         urlInvocations() {
             return `/workflows/${this.workflow.id}/invocations`;
         },
         urlViewShared() {
-            return safePath(
+            return withPrefix(
                 `/workflow/display_by_username_and_slug?username=${this.workflow.owner}&slug=${encodeURIComponent(
                     this.workflow.slug
                 )}`
@@ -217,6 +216,15 @@ export default {
                 .catch((error) => {
                     this.$emit("onError", error);
                 });
+        },
+        getWorkflowTooltip: function (sourceType, workflow) {
+            let tooltip = "";
+            if (sourceType.includes("trs")) {
+                tooltip = `Imported from TRS ID (version ${workflow.source_metadata.trs_version_id})`;
+            } else if (sourceType == "url") {
+                tooltip = `Imported from ${workflow.source_metadata.url}`;
+            }
+            return tooltip;
         },
     },
 };

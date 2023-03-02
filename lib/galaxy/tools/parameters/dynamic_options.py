@@ -9,6 +9,7 @@ import re
 from io import StringIO
 
 from galaxy.model import (
+    DatasetCollectionElement,
     HistoryDatasetAssociation,
     HistoryDatasetCollectionAssociation,
     MetadataFile,
@@ -113,7 +114,7 @@ class RegexpFilter(Filter):
             pass
         filter_pattern = re.compile(filter_value)
         for fields in options:
-            if self.keep == (not filter_pattern.match(fields[self.column]) is None):
+            if self.keep == (filter_pattern.match(fields[self.column]) is not None):
                 rval.append(fields)
         return rval
 
@@ -812,12 +813,15 @@ def _get_ref_data(other_values, ref_name):
         (
             DatasetFilenameWrapper,
             HistoryDatasetAssociation,
+            DatasetCollectionElement,
             DatasetListWrapper,
             HistoryDatasetCollectionAssociation,
             list,
         ),
     ):
         raise ValueError
+    if isinstance(ref, DatasetCollectionElement) and ref.hda:
+        ref = ref.hda
     if isinstance(ref, (DatasetFilenameWrapper, HistoryDatasetAssociation)):
         ref = [ref]
     elif isinstance(ref, HistoryDatasetCollectionAssociation):

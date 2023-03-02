@@ -1,7 +1,7 @@
 <template>
     <FormCard :title="outputTitle" collapsible :expanded.sync="expanded">
         <template v-slot:body>
-            <FormOutputLabel :name="outputName" :active-outputs="activeOutputs" />
+            <FormOutputLabel :name="outputName" :step="step" />
             <FormElement
                 :id="actionNames.RenameDatasetAction__newname"
                 :value="formData[actionNames.RenameDatasetAction__newname]"
@@ -81,9 +81,9 @@
 </template>
 
 <script>
-import FormCard from "components/Form/FormCard";
-import FormElement from "components/Form/FormElement";
-import FormOutputLabel from "./FormOutputLabel";
+import FormCard from "@/components/Form/FormCard";
+import FormElement from "@/components/Form/FormElement";
+import FormOutputLabel from "@/components/Workflow/Editor/Forms/FormOutputLabel";
 
 const actions = [
     "RenameDatasetAction__newname",
@@ -115,10 +115,6 @@ export default {
             type: String,
             default: null,
         },
-        outputLabelError: {
-            type: String,
-            required: null,
-        },
         inputs: {
             type: Array,
             required: true,
@@ -131,7 +127,8 @@ export default {
             type: Object,
             required: true,
         },
-        activeOutputs: {
+        step: {
+            // type Step from @/stores/workflowStepStore
             type: Object,
             required: true,
         },

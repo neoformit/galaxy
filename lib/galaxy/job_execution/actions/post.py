@@ -3,7 +3,6 @@ Actions to be run at job completion (or output hda creation, as in the case of
 immediate_actions listed below.
 """
 import datetime
-import socket
 
 from markupsafe import escape
 
@@ -53,25 +52,21 @@ class EmailAction(DefaultJobAction):
     @classmethod
     def execute(cls, app, sa_session, action, job, replacement_dict, final_job_state=None):
         try:
-            frm = app.config.email_from
             history_id_encoded = app.security.encode_id(job.history_id)
-            invocation_id_encoded = app.security.encode_id(job.workflow_invocation_step.workflow_invocation_id)
+            link_invocation = None
+            if job.workflow_invocation_step:
+                invocation_id_encoded = app.security.encode_id(job.workflow_invocation_step.workflow_invocation_id)
+                link_invocation = (
+                    f"{app.config.galaxy_infrastructure_url}/workflows/invocations/report?id={invocation_id_encoded}"
+                )
             link = f"{app.config.galaxy_infrastructure_url}/histories/view?id={history_id_encoded}"
-            link_invocation = (
-                f"{app.config.galaxy_infrastructure_url}/workflows/invocations/report?id={invocation_id_encoded}"
-            )
-            if frm is None:
-                if action.action_arguments and "host" in action.action_arguments:
-                    host = action.action_arguments["host"]
-                else:
-                    host = socket.getfqdn()
-                frm = f"galaxy-no-reply@{host}"
             to = job.get_user_email()
             subject = f"Galaxy job completion notification from history '{job.history.name}'"
             outdata = ",\n".join(ds.dataset.display_name() for ds in job.output_datasets)
             body = f"Your Galaxy job generating dataset(s):\n\n{outdata}\n\nis complete as of {datetime.datetime.now().strftime('%I:%M')}. Click the link below to access your data: \n{link}"
-            body += f"\n\nWorkflow Invocation Report:\n{link_invocation}"
-            send_mail(frm, to, subject, body, app.config)
+            if link_invocation:
+                body += f"\n\nWorkflow Invocation Report:\n{link_invocation}"
+            send_mail(app.config.email_from, to, subject, body, app.config)
         except Exception as e:
             log.error("EmailAction PJA Failed, exception: %s", unicodify(e))
 
@@ -109,6 +104,9 @@ class ChangeDatatypeAction(DefaultJobAction):
 
     @classmethod
     def execute(cls, app, sa_session, action, job, replacement_dict, final_job_state=None):
+        if job.state == job.states.SKIPPED:
+            # Don't change datatype, must remain expression.json
+            return
         for dataset_assoc in job.output_datasets:
             if action.output_name == "" or dataset_assoc.name == action.output_name:
                 app.datatypes_registry.change_datatype(dataset_assoc.dataset, action.action_arguments["newtype"])
@@ -330,7 +328,7 @@ class ColumnSetAction(DefaultJobAction):
 
     @classmethod
     def get_short_str(cls, pja):
-        return f"Set the following metadata values:<br/>{'<br/>'.join('{} : {}'.format(escape(k), escape(v)) for k, v in pja.action_arguments.items())}"
+        return f"Set the following metadata values:<br/>{'<br/>'.join(f'{escape(k)} : {escape(v)}' for k, v in pja.action_arguments.items())}"
 
 
 class SetMetadataAction(DefaultJobAction):
@@ -399,7 +397,7 @@ class DeleteIntermediatesAction(DefaultJobAction):
                         )
                     else:
                         creating_jobs.append((input_dataset, input_dataset.dataset.creating_job))
-                for (input_dataset, creating_job) in creating_jobs:
+                for input_dataset, creating_job in creating_jobs:
                     sa_session.refresh(creating_job)
                     sa_session.refresh(input_dataset)
                 for input_dataset in [
@@ -494,7 +492,6 @@ class RemoveTagDatasetAction(TagDatasetAction):
 
 
 class ActionBox:
-
     actions = {
         "RenameDatasetAction": RenameDatasetAction,
         "HideDatasetAction": HideDatasetAction,

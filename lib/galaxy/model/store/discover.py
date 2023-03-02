@@ -104,7 +104,6 @@ class ModelPersistenceContext(metaclass=abc.ABCMeta):
 
         if primary_data is not None:
             primary_data.extension = ext
-            primary_data.visible = visible
             primary_data.dbkey = dbkey
         else:
             if not library_folder:
@@ -358,9 +357,7 @@ class ModelPersistenceContext(metaclass=abc.ABCMeta):
             element_datasets["paths"].append(filename)
 
         self.add_tags_to_datasets(datasets=element_datasets["datasets"], tag_lists=element_datasets["tag_lists"])
-        for (element_identifiers, dataset) in zip(
-            element_datasets["element_identifiers"], element_datasets["datasets"]
-        ):
+        for element_identifiers, dataset in zip(element_datasets["element_identifiers"], element_datasets["datasets"]):
             current_builder = root_collection_builder
             for element_identifier in element_identifiers[:-1]:
                 current_builder = current_builder.get_level(element_identifier)
@@ -400,25 +397,29 @@ class ModelPersistenceContext(metaclass=abc.ABCMeta):
             else:
                 dataset.set_size(no_extra_files=True)
 
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def tag_handler(self):
         """Return a galaxy.model.tags.TagHandler-like object for persisting tags."""
 
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def user(self):
         """If bound to a database, return the user the datasets should be created for.
 
         Return None otherwise.
         """
 
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def sa_session(self) -> Optional[ScopedSession]:
         """If bound to a database, return the SQL Alchemy session.
 
         Return None otherwise.
         """
 
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def permission_provider(self) -> "PermissionProvider":
         """If bound to a database, return the SQL Alchemy session.
 
@@ -429,19 +430,23 @@ class ModelPersistenceContext(metaclass=abc.ABCMeta):
         """No-op, no job context."""
         return None
 
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def job(self) -> Optional[galaxy.model.Job]:
         """Return associated job object if bound to a job finish context connected to a database."""
 
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def metadata_source_provider(self) -> "MetadataSourceProvider":
         """Return associated MetadataSourceProvider object."""
 
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def object_store(self) -> ObjectStore:
         """Return object store to use for populating discovered dataset contents."""
 
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def flush_per_n_datasets(self) -> Optional[int]:
         pass
 
@@ -805,12 +810,13 @@ def persist_hdas(elements, model_persistence_context, final_job_state="ok"):
                 hashes = fields_match.hashes
                 created_from_basename = fields_match.created_from_basename
                 extra_files = fields_match.extra_files
+                visible = fields_match.visible
 
                 info, state = discovered_file.discovered_state(element, final_job_state)
                 dataset = model_persistence_context.create_dataset(
                     ext=ext,
                     designation=designation,
-                    visible=True,
+                    visible=visible,
                     dbkey=dbkey,
                     name=name,
                     filename=discovered_file.path,

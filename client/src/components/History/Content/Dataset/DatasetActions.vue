@@ -44,7 +44,7 @@
                 </b-button>
                 <b-button
                     v-if="showVisualizations"
-                    class="px-1"
+                    class="visualize-btn px-1"
                     title="Visualize"
                     size="sm"
                     variant="link"
@@ -71,7 +71,7 @@
 
 <script>
 import { copy as sendToClipboard } from "utils/clipboard";
-import { absPath, prependPath } from "utils/redirect.js";
+import { absPath, prependPath } from "@/utils/redirect";
 import { downloadUrlMixin } from "./mixins.js";
 import DatasetDownload from "./DatasetDownload";
 

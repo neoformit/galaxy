@@ -2,6 +2,7 @@
 Heterogenous lists/contents are difficult to query properly since unions are
 not easily made.
 """
+import json
 import logging
 from typing import (
     Any,
@@ -36,11 +37,14 @@ from galaxy.managers import (
     annotatable,
     base,
     deletable,
+    genomes,
     hdas,
     hdcas,
     taggable,
     tools,
 )
+from galaxy.managers.job_connections import JobConnectionsManager
+from galaxy.schema import ValueFilterQueryParams
 from galaxy.structured_app import MinimalManagerApp
 from .base import (
     parse_bool,
@@ -54,7 +58,6 @@ log = logging.getLogger(__name__)
 # into its own class to have it's own filters, etc.
 # TODO: but can't inherit from model manager (which assumes only one model)
 class HistoryContentsManager(base.SortableManager):
-
     root_container_class = model.History
 
     contained_class = model.HistoryDatasetAssociation
@@ -435,7 +438,7 @@ class HistoryContentsManager(base.SortableManager):
             .query(component_class)
             .filter(component_class.id.in_(id_list))
             .options(undefer(component_class._metadata))
-            .options(joinedload("dataset.actions"))  # TODO: use class attr after moving Dataset to declarative mapping.
+            .options(joinedload(component_class.dataset).joinedload(model.Dataset.actions))
             .options(joinedload(component_class.tags))
             .options(joinedload(component_class.annotations))  # type: ignore[attr-defined]
         )
@@ -519,14 +522,38 @@ class HistoryContentsFilters(
     base.ModelFilterParser,
     annotatable.AnnotatableFilterMixin,
     deletable.PurgableFiltersMixin,
+    genomes.GenomeFilterMixin,
     taggable.TaggableFilterMixin,
     tools.ToolFilterMixin,
 ):
     # surprisingly (but ominously), this works for both content classes in the union that's filtered
     model_class = model.HistoryDatasetAssociation
 
-    def _parse_orm_filter(self, attr, op, val):
+    def parse_query_filters_with_relations(self, query_filters: ValueFilterQueryParams, history_id):
+        """Parse query filters but consider case where related filter is included."""
+        if query_filters.q and query_filters.qv and "related-eq" in query_filters.q:
+            qv_index = query_filters.q.index("related-eq")
+            qv_hid = query_filters.qv[qv_index]
 
+            # Make new q and qv excluding related filter
+            new_q = [x for i, x in enumerate(query_filters.q) if i != qv_index]
+            new_qv = [x for i, x in enumerate(query_filters.qv) if i != qv_index]
+
+            # Get list of related item hids from job_connections manager
+            job_connections_manager = JobConnectionsManager(self.app.model.session)
+            related = job_connections_manager.get_related_hids(history_id, qv_hid)
+
+            # Make new query_filters with updated list of related hids for given hid
+            new_q.append("related-eq")
+            new_qv.append(json.dumps(related))
+            query_filters_with_relations = ValueFilterQueryParams(
+                q=new_q,
+                qv=new_qv,
+            )
+            return super().parse_query_filters(query_filters_with_relations)
+        return super().parse_query_filters(query_filters)
+
+    def _parse_orm_filter(self, attr, op, val):
         # we need to use some manual/text/column fu here since some where clauses on the union don't work
         # using the model_class defined above - they need to be wrapped in their own .column()
         # (and some of these are *not* a normal columns (especially 'state') anyway)
@@ -536,6 +563,11 @@ class HistoryContentsFilters(
             if attr == "history_content_type" and op == "eq":
                 if val in ("dataset", "dataset_collection"):
                     return sql.column("history_content_type") == val
+                raise_filter_err(attr, op, val, "bad op in filter")
+
+            if attr == "related":
+                if op == "eq":
+                    return sql.column("hid").in_(json.loads(val))
                 raise_filter_err(attr, op, val, "bad op in filter")
 
             if attr == "type_id":
@@ -589,12 +621,15 @@ class HistoryContentsFilters(
     def _add_parsers(self):
         super()._add_parsers()
         annotatable.AnnotatableFilterMixin._add_parsers(self)
+        genomes.GenomeFilterMixin._add_parsers(self)
         deletable.PurgableFiltersMixin._add_parsers(self)
         taggable.TaggableFilterMixin._add_parsers(self)
         tools.ToolFilterMixin._add_parsers(self)
         self.orm_filter_parsers.update(
             {
                 "history_content_type": {"op": ("eq")},
+                # maybe remove related from here, as there's no corresponding field?
+                "related": {"op": ("eq")},
                 "type_id": {"op": ("eq", "in"), "val": self.parse_type_id_list},
                 "hid": {"op": ("eq", "ge", "le", "gt", "lt"), "val": int},
                 # TODO: needs a different val parser - but no way to add to the above

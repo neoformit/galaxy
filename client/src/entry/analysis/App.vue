@@ -12,25 +12,25 @@
                 :tabs="tabs"
                 :window-tab="windowTab"
                 @open-url="openUrl" />
-            <alert
+            <Alert
                 v-if="config.message_box_visible && config.message_box_content"
                 id="messagebox"
                 class="rounded-0 m-0 p-2"
                 :variant="config.message_box_class || 'info'">
                 <span class="fa fa-fw mr-1 fa-exclamation" />
                 <span>{{ config.message_box_content }}</span>
-            </alert>
-            <alert
+            </Alert>
+            <Alert
                 v-if="config.show_inactivity_warning && config.inactivity_box_content"
                 id="inactivebox"
                 class="rounded-0 m-0 p-2"
-                variant="alert-warning">
+                variant="warning">
                 <span class="fa fa-fw mr-1 fa-exclamation-triangle" />
                 <span>{{ config.inactivity_box_content }}</span>
                 <span>
                     <a class="ml-1" :href="resendUrl">Resend Verification</a>
                 </span>
-            </alert>
+            </Alert>
             <router-view @update:confirmation="confirmation = $event" />
         </div>
         <div id="dd-helper" />
@@ -40,6 +40,7 @@
     </div>
 </template>
 <script>
+import Alert from "@/components/Alert.vue";
 import Modal from "mvc/ui/ui-modal";
 import Masthead from "components/Masthead/Masthead.vue";
 import { getGalaxyInstance } from "app";
@@ -47,7 +48,7 @@ import { getAppRoot } from "onload";
 import { HistoryPanelProxy } from "components/History/adapters/HistoryPanelProxy";
 import { fetchMenu } from "entry/analysis/menu";
 import { WindowManager } from "layout/window-manager";
-import { safePath } from "utils/redirect";
+import { withPrefix } from "utils/redirect";
 import Toast from "components/Toast";
 import ConfirmDialog from "components/ConfirmDialog";
 import UploadModal from "components/Upload/UploadModal.vue";
@@ -55,10 +56,11 @@ import { ref } from "vue";
 import { setToastComponentRef } from "composables/toast";
 import { setConfirmDialogComponentRef } from "composables/confirmDialog";
 import { setGlobalUploadModal } from "composables/globalUploadModal";
-import { useCurrentTheme } from "@/composables/userFlags";
+import { useCurrentTheme } from "@/composables/user";
 
 export default {
     components: {
+        Alert,
         Masthead,
         Toast,
         ConfirmDialog,
@@ -98,7 +100,13 @@ export default {
             return true;
         },
         theme() {
-            return this.config.themes[this.currentTheme];
+            const themeKeys = Object.keys(this.config.themes);
+            if (themeKeys.length > 0) {
+                const foundTheme = themeKeys.includes(this.currentTheme);
+                const selectedTheme = foundTheme ? this.currentTheme : themeKeys[0];
+                return this.config.themes[selectedTheme];
+            }
+            return null;
         },
         windowTab() {
             return this.windowManager.getTab();
@@ -128,7 +136,7 @@ export default {
             if (!urlObj.target) {
                 this.$router.push(urlObj.url);
             } else {
-                const url = safePath(urlObj.url);
+                const url = withPrefix(urlObj.url);
                 if (urlObj.target == "_blank") {
                     window.open(url);
                 } else {

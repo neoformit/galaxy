@@ -3,19 +3,16 @@ import logging
 import os
 from typing import (
     Set,
-    TYPE_CHECKING,
     Union,
 )
 
+from galaxy.datatypes.protocols import DatasetProtocol
 from galaxy.datatypes.sniff import (
     build_sniff_from_prefix,
     FilePrefix,
     iter_headers,
 )
 from .tabular import Tabular
-
-if TYPE_CHECKING:
-    from galaxy.model import DatasetInstance
 
 log = logging.getLogger(__name__)
 
@@ -27,7 +24,7 @@ class GoldenPath(Tabular):
     edam_format = "format_3693"
     file_ext = "agp"
 
-    def set_meta(self, dataset: "DatasetInstance", overwrite: bool = True, **kwd) -> None:
+    def set_meta(self, dataset: DatasetProtocol, overwrite: bool = True, **kwd) -> None:
         # AGPFile reads and validates entire file.
         AGPFile(dataset.file_name)
         super().set_meta(dataset, overwrite=overwrite, **kwd)
@@ -125,7 +122,6 @@ class AGPFile:
     """
 
     def __init__(self, in_file):
-
         self._agp_version = "2.1"
         self._fname = os.path.abspath(in_file)
 
@@ -193,7 +189,6 @@ class AGPFile:
     def _add_line(self, agp_line):
         # Perform validity checks if this is a new object
         if agp_line.obj != self._current_obj:
-
             # Check if we have already seen this object before
             if agp_line.obj in self._seen_objs:
                 raise AGPError(self.fname, agp_line.line_number, "object identifier out of order")

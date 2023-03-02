@@ -2108,6 +2108,15 @@ mapping:
           Determines the minimum log level that will be sent as an event to Sentry.
           Possible values are DEBUG, INFO, WARNING, ERROR or CRITICAL.
 
+      sentry_traces_sample_rate:
+        type: float
+        default: 0.0
+        required: false
+        desc: |
+          Set to a number between 0 and 1. With this option set, every transaction created
+          will have that percentage chance of being sent to Sentry. A value higher than 0
+          is required to analyze performance.
+
       statsd_host:
         type: str
         required: false
@@ -2896,13 +2905,6 @@ mapping:
         desc: |
           When the simplified workflow run form is rendered, should the invocation use job
           caching. This isn't a boolean so an option for 'show-selection' can be added later.
-
-      myexperiment_target_url:
-        type: str
-        default: www.myexperiment.org:80
-        required: false
-        desc: |
-          The URL to the myExperiment instance being used (omit scheme but include port).
 
       ftp_upload_site:
         type: str
@@ -3694,3 +3696,11 @@ mapping:
         desc: |
           Optional file containing one or more themes for galaxy. If several themes
           are defined, users can choose their preferred theme in the client.
+
+      enable_beacon_integration:
+        type: bool
+        default: false
+        required: false
+        desc: |
+          Enables user preferences and api endpoint for the beacon integration.
+

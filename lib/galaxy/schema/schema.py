@@ -733,6 +733,11 @@ class HDCJobStateSummary(Model):
         title="Paused jobs",
         description="Number of jobs in the `paused` state.",
     )
+    skipped: int = Field(
+        0,
+        title="Skipped jobs",
+        description="Number of jobs that were skipped due to conditional workflow step execution.",
+    )
     deleted_new: int = Field(
         0,
         title="Deleted new jobs",
@@ -1088,11 +1093,7 @@ class ExportHistoryArchivePayload(Model):
     )
 
 
-class WorkflowSortByEnum(str, Enum):
-    create_time = "create_time"
-    update_time = "update_time"
-    name = "name"
-    none = None
+WorkflowSortByEnum = Literal["create_time", "update_time", "name"]
 
 
 class WorkflowIndexQueryPayload(Model):
@@ -2273,6 +2274,24 @@ class GroupUserListModel(Model):
     __root__: List[GroupUserModel]
 
 
+class ImportToolDataBundleUriSource(Model):
+    src: Literal["uri"] = Field(title="src", description="Indicates that the tool data should be resolved by a URI.")
+    uri: str = Field(
+        title="uri",
+        description="URI to fetch tool data bundle from (file:// URIs are fine because this is an admin-only operation)",
+    )
+
+
+class ImportToolDataBundleDatasetSource(Model):
+    src: Literal["hda", "ldda"] = Field(
+        title="src", description="Indicates that the tool data should be resolved from a dataset."
+    )
+    id: DecodedDatabaseIdField = EntityIdField
+
+
+ImportToolDataBundleSource = Union[ImportToolDataBundleDatasetSource, ImportToolDataBundleUriSource]
+
+
 class ToolShedRepository(Model):
     tool_shed_url: str = Field(
         title="Tool Shed URL", default="https://toolshed.g2.bx.psu.edu/", description="Tool Shed target"
@@ -2695,12 +2714,7 @@ class LibraryFolderCurrentPermissions(Model):
     )
 
 
-class LibraryFolderContentsIndexSortByEnum(str, Enum):
-    name = "name"
-    description = "description"
-    type = "type"
-    size = "size"
-    update_time = "update_time"
+LibraryFolderContentsIndexSortByEnum = Literal["name", "description", "type", "size", "update_time"]
 
 
 class LibraryFolderContentsIndexQueryPayload(Model):
@@ -2708,7 +2722,7 @@ class LibraryFolderContentsIndexQueryPayload(Model):
     offset: int = 0
     search_text: Optional[str] = None
     include_deleted: Optional[bool] = None
-    order_by: LibraryFolderContentsIndexSortByEnum = LibraryFolderContentsIndexSortByEnum.name
+    order_by: LibraryFolderContentsIndexSortByEnum = "name"
     sort_desc: Optional[bool] = False
 
 
@@ -3022,6 +3036,14 @@ class UserEmail(Model):
         ...,
         title="Email",
         description="The email of the user.",
+    )
+
+
+class UserBeaconSetting(Model):
+    enabled: bool = Field(
+        ...,
+        title="Enabled",
+        description="True if beacon sharing is enabled",
     )
 
 
