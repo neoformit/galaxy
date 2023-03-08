@@ -186,8 +186,14 @@ export default {
             return this.details.model;
         },
     },
+    watch: {
+        extension: function (value) {
+            this.updateExtension(value);
+        },
+    },
     created() {
-
+        this.initCollection();
+        this.initAppProperties();
     },
     mounted() {
         this.initExtensionInfo();
@@ -195,15 +201,16 @@ export default {
         this.initUploadbox({
             initUrl: (index) => {
                 if (!this.uploadUrl) {
-// TODO             this.uploadUrl = this.getRequestUrl([this.collection.get(index)], this.history_id);
+                    this.uploadUrl = this.getRequestUrl([this.collection.get(index)], this.history_id);
                 }
                 return this.uploadUrl;
             },
+            multiple: this.multiple,
             announce: (index, file) => {
                 this._eventAnnounce(index, file);
             },
             initialize: (index) => {
-// TODO         return uploadModelsToPayload([this.collection.get(index)], this.history_id);
+                return uploadModelsToPayload([this.collection.get(index)], this.history_id);
             },
             progress: (index, percentage) => {
                 this._eventProgress(index, percentage);
@@ -232,6 +239,7 @@ export default {
     methods: {
         _eventStart() {
 /* There are a few different ways to go here...
+Probably want to base action on current state
 
 See UploadBoxMixin:_eventStart for parent method
 
