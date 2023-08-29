@@ -37,7 +37,8 @@ def render_plots(call, plots):
 
 def get_render_func(plot):
     """Return the appropriate function to render plot."""
-    return OPTIONS['plots'][plot['plot_types']['plot_type'].value]
+    # TODO: fix this...
+    pass
 
 
 def reduced_dimension_plot(pw="6L"):
