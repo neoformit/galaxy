@@ -1,0 +1,6 @@
+id: subdomain_switcher
+type:
+  - masthead
+activate: true
+icon: fa-connectdevelop
+tooltip: Switch sites
