@@ -1,32 +1,41 @@
 // Custom messages for tool forms
 
-const enableDebug = false;
-const debugLog = (msg) => enableDebug && console.debug("[ToolMsg]: " + msg);
+const enableDebug = true;
+const debugLog = (msg) => enableDebug && console.log("[ToolMsg]: " + msg);
 
-const WAIT_TOOL_MAX_TRIES = 3;
-const WAIT_TOOL_INTERVAL = 500;
+const WAIT_TOOL_MAX_SECONDS = 5;
+const WAIT_TOOL_INTERVAL_MS = 500;
 const toolMessages = [
     {
         tool_id: "addValue",
         message: "HELLO WORLD",
         class: "info",
     },
+    {
+        tool_id: "toolshed.g2.bx.psu.edu/repos/iuc/ena_upload/ena_upload",
+        message: "HELLO WORLD",
+        class: "info",
+    },
 ];
+let tries = 0;
+let lastUrlPath = null;
 
 function waitToolFormLoad() {
     tries++;
-    let matched = false;
     const element = document.querySelector('div[tool_id]');
     if (element) {
         debugLog('Tool form has been loaded');
-        matched = showToolMessages();
-        tries = WAIT_TOOL_MAX_TRIES;
+        showToolMessages();
     } else {
         debugLog("No tool form detected (tries: " + tries + ")");
+        tries < (
+            WAIT_TOOL_MAX_SECONDS * 1000
+            / WAIT_TOOL_INTERVAL_MS
+         ) && setTimeout(
+            waitToolFormLoad,
+            WAIT_TOOL_INTERVAL_MS,
+        );
     }
-    tries < WAIT_TOOL_MAX_TRIES
-        && !matched
-        && setTimeout(waitToolFormLoad, WAIT_TOOL_INTERVAL);
 }
 
 function isCurrentToolForm(toolId) {
@@ -61,16 +70,13 @@ function showToolMessages() {
     return match;
 }
 
-let tries = 0;
-let lastUrlPath = null;
-
 // Add observer for Vue pathname changes
 const observer = new MutationObserver( () => {
     if (lastUrlPath !== window.location.href) {
         debugLog("Triggered mutation observer");
         tries = 0;
         lastUrlPath = window.location.href;
-        setTimeout(waitToolFormLoad, 500);
+        setTimeout(waitToolFormLoad, WAIT_TOOL_INTERVAL_MS);
     }
 });
 
