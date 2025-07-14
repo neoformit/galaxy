@@ -1,5 +1,10 @@
 // Show random Galaxy tips on tool/workflow submission page
 
+// Use this func in the console to load a specific Galaxy tip for review:
+// To load tip 5.html (when currently on a tool/workflow submission page):
+// >>> loadGalaxyTipFunction(5);
+let loadGalaxyTipFunction;
+
 $(document).ready( () => {
 
   const TIPS_GITHUB_URL = "https://api.github.com/repos/usegalaxy-au/galaxy-tips/contents/tips";
@@ -7,7 +12,6 @@ $(document).ready( () => {
   const TIPS_HEADER_IMG_URL = "https://github.com/usegalaxy-au/galaxy-tips/blob/main/static/img/header.png?raw=true";
   const TIP_HEADER = `<img class="galaxy-tips-logo" src="${TIPS_HEADER_IMG_URL}" alt="Galaxy Tips header image">`;
   const parent = document.getElementById('galaxy_tips');
-
 
   async function waitForImagesToLoad(container) {
     const images = container.querySelectorAll('img');
@@ -26,7 +30,6 @@ $(document).ready( () => {
     await Promise.all(promises);
   }
 
-
   function getRandomInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
@@ -39,15 +42,8 @@ $(document).ready( () => {
     .then(items => items.filter(i => i.type === 'file').length)
     .catch(console.error);
 
-
-  fetchGalaxyTipsCount.then(count => {
-    console.log(`Found ${count} Galaxy tips in GitHub remote.`);
-    if (count === 0 || !parent) {
-      return;
-    }
-    const randomIndex = getRandomInt(1, count);
-    const tipUrl = `${TIPS_GITHUB_RAW_BASE_URL}/${randomIndex}.html`;
-
+  function loadGalaxyTip(tipIndex) {
+    const tipUrl = `${TIPS_GITHUB_RAW_BASE_URL}/${tipIndex}.html`;
     fetch(tipUrl)
       .then(res => {
         if (!res.ok) throw new Error(`Error fetching tip: ${res.status}`);
@@ -62,6 +58,16 @@ $(document).ready( () => {
       .then(() => waitForImagesToLoad(parent))
       .then(() => parent.querySelector('.galaxy-tip').classList.add('loaded'))
       .catch(console.error);
+  }
+  loadGalaxyTipFunction = loadGalaxyTip;
+
+  fetchGalaxyTipsCount.then(count => {
+    console.log(`Found ${count} Galaxy tips in GitHub remote.`);
+    if (count === 0 || !parent) {
+      return;
+    }
+    const randomIndex = getRandomInt(1, count);
+    loadGalaxyTip(randomIndex);
   });
 
 });
