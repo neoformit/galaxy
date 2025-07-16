@@ -22,7 +22,7 @@ let lastUrlPath = null;
 
 function waitToolFormLoad() {
     tries++;
-    const element = document.querySelector('div[tool_id]');
+    const element = document.getElementById('tool-card-body');
     if (element) {
         debugLog('Tool form has been loaded');
         showToolMessages();
@@ -53,14 +53,18 @@ function isCurrentToolForm(toolId) {
 
 function showToolMessages() {
     let match = false;
-    toolMessages.forEach( (toolMessage) => {
+    toolMessages.forEach( (toolMessage, i) => {
         if (isCurrentToolForm(toolMessage.tool_id)) {
+            const msgId = `toolmsg-${i}`
             const newElement = document.createElement('p');
+            newElement.id = msgId;
             newElement.className = 'alert alert-' + toolMessage.class + ' my-3';
             newElement.innerHTML = toolMessage.message;
             const referenceElement = document.getElementById('tool-card-body');
             if (referenceElement) {
-                referenceElement.parentNode.insertBefore(newElement, referenceElement);
+                // Ensure that message is not inserted twice
+                document.getElementById(msgId)
+                || referenceElement.parentNode.insertBefore(newElement, referenceElement);
             } else {
                 debugLog('Reference element with id="tool-card-body" not found.');
             }
