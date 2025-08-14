@@ -1,4 +1,6 @@
 .galaxy-tip {
+  position: relative;
+  bottom: 2rem;
   width: 100%;
   max-width: 800px;
   margin: 5rem auto;

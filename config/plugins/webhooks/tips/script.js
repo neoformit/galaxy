@@ -7,15 +7,17 @@ let loadGalaxyTipFunction;
 
 $(document).ready( () => {
 
-  const TIPS_GITHUB_URL = "https://api.github.com/repos/usegalaxy-au/galaxy-tips/contents/tips";
-  const TIPS_GITHUB_RAW_BASE_URL = "https://raw.githubusercontent.com/usegalaxy-au/galaxy-tips/refs/heads/main/tips/"
+  const GITHUB_BRANCH = "dev"; // Change to "dev" to use development branch
+  const TIPS_GITHUB_URL = `https://api.github.com/repos/usegalaxy-au/galaxy-tips/contents/tips?ref=${GITHUB_BRANCH}`;
+  const TIPS_GITHUB_RAW_BASE_URL = `https://raw.githubusercontent.com/usegalaxy-au/galaxy-tips/refs/heads/${GITHUB_BRANCH}/tips/`
   const TIPS_HEADER_IMG_URL = "https://github.com/usegalaxy-au/galaxy-tips/blob/main/static/img/header.png?raw=true";
   const TIP_HEADER = `<img class="galaxy-tips-logo" src="${TIPS_HEADER_IMG_URL}" alt="Galaxy Tips header image">`;
   const parent = document.getElementById('galaxy_tips');
 
+
+  // Wait for any images to load before revealing the tip
   async function waitForImagesToLoad(container) {
     const images = container.querySelectorAll('img');
-
     const promises = Array.from(images).map(img => {
       if (img.complete) return Promise.resolve();
       return new Promise(resolve => {
@@ -30,17 +32,20 @@ $(document).ready( () => {
     await Promise.all(promises);
   }
 
+
   function getRandomInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
+
 
   const fetchGalaxyTipsCount = fetch(TIPS_GITHUB_URL)
     .then(res => {
       if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
       return res.json();
     })
-    .then(items => items.filter(i => i.type === 'file').length)
+    .then(items => items.filter(i => i.type === 'file' && i.name.endsWith('.html')).length)
     .catch(console.error);
+
 
   function loadGalaxyTip(tipIndex) {
     const tipUrl = `${TIPS_GITHUB_RAW_BASE_URL}/${tipIndex}.html`;
@@ -60,6 +65,7 @@ $(document).ready( () => {
       .catch(console.error);
   }
   loadGalaxyTipFunction = loadGalaxyTip;
+
 
   fetchGalaxyTipsCount.then(count => {
     console.log(`Found ${count} Galaxy tips in GitHub remote.`);
