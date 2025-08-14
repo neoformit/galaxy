@@ -56,22 +56,31 @@ function showToolMessages() {
     toolMessages.forEach( (toolMessage, i) => {
         if (isCurrentToolForm(toolMessage.tool_id)) {
             const msgId = `toolmsg-${i}`
-            const newElement = document.createElement('p');
-            newElement.id = msgId;
-            newElement.className = 'alert alert-' + toolMessage.class + ' my-3';
-            newElement.innerHTML = toolMessage.message;
-            const referenceElement = document.getElementById('tool-card-body');
-            if (referenceElement) {
-                // Ensure that message is not inserted twice
-                document.getElementById(msgId)
-                || referenceElement.parentNode.insertBefore(newElement, referenceElement);
-            } else {
-                debugLog('Reference element with id="tool-card-body" not found.');
-            }
+            const msgElement = document.createElement('p');
+            msgElement.id = msgId;
+            msgElement.className = 'alert alert-' + toolMessage.class + ' my-3';
+            msgElement.innerHTML = toolMessage.message;
+            let refElement = document.getElementById('tool-card-body');
+            insertToolMsgElement(msgId, msgElement, refElement)
             match = true;
         }
     })
     return match;
+}
+
+// Ensure the reference element is really available - it seems to appear and
+// disappear on more complex tool form renders
+function insertToolMsgElement(msgId, msgElement, refElement) {
+    if (!refElement) {
+        debugLog('Waiting for reference element with id="tool-card-body"...');
+        setTimeout(
+            () => insertToolMsgElement(msgId, msgElement, refElement),
+            WAIT_TOOL_INTERVAL_MS);
+        return;
+    }
+    // Only insert if the message is not already present
+    document.getElementById(msgId)
+    || referenceElement.parentNode.insertBefore(msgElement, refElement);
 }
 
 // Add observer for Vue pathname changes
