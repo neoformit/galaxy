@@ -103,6 +103,11 @@
                     @onClick="onExecute(config, currentHistoryId)" />
             </template>
         </ToolCard>
+
+        <!-- insert footer here? -->
+        <div class="footer">
+            <p style="font-size: 1.5rem; color: orange; text-align: center; padding: 1rem;">Templated Galaxy footer!</p>
+        </div>
     </div>
 </template>
 

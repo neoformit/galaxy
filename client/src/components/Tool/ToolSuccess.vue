@@ -30,17 +30,24 @@ if (!latestResponse.value || Object.keys(latestResponse.value).length === 0) {
 </script>
 
 <template>
-    <section>
-        <BAlert v-if="!jobResponse" variant="info" show>
-            <LoadingSpan message="Waiting on data" />
-        </BAlert>
-        <div v-else>
-            <div v-if="jobResponse?.produces_entry_points">
-                <ToolEntryPoints v-for="job in jobResponse.jobs" :key="job.id" :job-id="job.id" />
+    <section class="d-flex flex-column">
+        <div>
+            <BAlert v-if="!jobResponse" variant="info" show>
+                <LoadingSpan message="Waiting on data" />
+            </BAlert>
+            <div v-else>
+                <div v-if="jobResponse?.produces_entry_points">
+                    <ToolEntryPoints v-for="job in jobResponse.jobs" :key="job.id" :job-id="job.id" />
+                </div>
+                <ToolSuccessMessage :job-response="jobResponse" :tool-name="toolName || '...'" />
+                <Webhook v-if="jobDef" type="tool" :tool-id="jobDef.tool_id" />
+                <ToolRecommendation v-if="showRecommendation && jobDef" :tool-id="jobDef.tool_id" />
             </div>
-            <ToolSuccessMessage :job-response="jobResponse" :tool-name="toolName || '...'" />
-            <Webhook v-if="jobDef" type="tool" :tool-id="jobDef.tool_id" />
-            <ToolRecommendation v-if="showRecommendation && jobDef" :tool-id="jobDef.tool_id" />
+        </div>
+
+        <!-- insert footer here? -->
+        <div class="footer" style="margin-top: auto;">
+            <p style="font-size: 1.5rem; color: orange; text-align: center; padding-top: 1rem;">Templated Galaxy footer!</p>
         </div>
     </section>
 </template>

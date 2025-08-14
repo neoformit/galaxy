@@ -29,7 +29,7 @@ const queryAttributeForceString = function (
 </script>
 
 <template>
-    <div class="overflow-auto m-3">
+    <div class="overflow-auto m-3 d-flex flex-column">
         <ChangePassword
             v-if="hasToken"
             id="change-password"
@@ -52,5 +52,10 @@ const queryAttributeForceString = function (
             :show-reset-link="config.enable_account_interface"
             :terms-url="config.terms_url"
             :welcome-url="config.welcome_url" />
+
+        <!-- insert footer here? -->
+        <div class="footer" style="margin-top: auto;">
+            <p style="font-size: 1.5rem; color: orange; text-align: center; padding-top: 1rem;">Templated Galaxy footer!</p>
+        </div>
     </div>
 </template>

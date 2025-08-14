@@ -95,5 +95,10 @@ function onLoad(ev: Event) {
             width="100%"
             height="100%"
             @load="onLoad" />
+
+        <!-- insert footer here? -->
+        <div class="footer" style="transform: translateY(-60px);">
+            <p style="font-size: 1.5rem; color: orange; text-align: center; padding: 1rem;">Templated Galaxy footer!</p>
+        </div>
     </div>
 </template>
