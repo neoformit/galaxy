@@ -80,7 +80,7 @@ function insertToolMsgElement(msgId, msgElement, refElement) {
     }
     // Only insert if the message is not already present
     document.getElementById(msgId)
-    || referenceElement.parentNode.insertBefore(msgElement, refElement);
+    || refElement.parentNode.insertBefore(msgElement, refElement);
 }
 
 // Add observer for Vue pathname changes
