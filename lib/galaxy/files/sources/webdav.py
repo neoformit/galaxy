@@ -65,6 +65,10 @@ class WebDavFilesSource(PyFilesystem2FilesSource[WebDavFileSourceTemplateConfigu
     template_config_class = WebDavFileSourceTemplateConfiguration
     resolved_config_class = WebDavFileSourceConfiguration
 
+    def get_url(self) -> Optional[str]:
+        url = self.template_config.url
+        return url if isinstance(url, str) else None
+
     def _open_fs(self, context: FilesSourceRuntimeContext[WebDavFileSourceConfiguration]):
         if WebDAVFS is None:
             raise self.required_package_exception
